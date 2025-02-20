@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Spinning Cube</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+        }
+
+        canvas {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas></canvas>
+    <!-- 
+        In Vite, we use the type="module" attribute to enable ES modules.
+        The script is processed by Vite's dev server and build process.
+        This allows us to use TypeScript and modern JavaScript features.
+    -->
+    <script type="module">
+      import {main} from "./src/core/main.ts";
+      window.addEventListener('load', () => {
+          // Since our graphics initialization is async, we need to catch any errors
+          main().catch(err => {
+              // If something goes wrong (like WebGPU not being supported),
+              // we show the error in a user-friendly way
+              console.error('Failed to initialize:', err);
+              document.body.innerHTML = `<pre style="color: red">${err}</pre>`;
+          });
+      });
+    </script>
+</body>
+</html>
