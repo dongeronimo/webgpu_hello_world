@@ -1,5 +1,5 @@
 import { BasePipeline } from "./basePipeline";
-
+///This pipeline is for the hello shader and meshes from blender.
 export class StandardPipeline extends BasePipeline {
     private vertexBufferLayout: GPUVertexBufferLayout;
     private dynamicMvpBufferSize: number;

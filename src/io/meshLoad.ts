@@ -54,16 +54,26 @@ export async function loadMesh(device: GPUDevice, path: string) {
         // WebGPU handles the memory allocation for us
     });
     device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-    
+
     // Now handle the index buffer
     // In GLTF, primitive.indices points to an accessor for the index data
     const indexData = await asset.accessorData(primitive.indices);
-    
+    console.log('Index data type:', indexData.constructor.name);
+    console.log('Index data length:', indexData.length);
+    const indexCount = indexData.length / 2; 
+    console.log('Expected index count:', indexCount);
+    const uint16Indices = new Uint16Array(indexCount);
+    for (let i = 0; i < indexCount; i++) {
+        // Combine two bytes to form one Uint16 value
+        uint16Indices[i] = indexData[i*2] | (indexData[i*2+1] << 8);
+    }
+    console.log('Processed index count:', uint16Indices.length);
+
     const indexBuffer = device.createBuffer({
-        size: indexData.byteLength,
+        size: uint16Indices.byteLength,
         usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(indexBuffer, 0, indexData);
+    device.queue.writeBuffer(indexBuffer, 0, uint16Indices);
     
     // Define how our vertex buffer should be interpreted by the pipeline
     const vertexBufferLayout: GPUVertexBufferLayout = {
@@ -95,6 +105,7 @@ export async function loadMesh(device: GPUDevice, path: string) {
         indexBuffer,
         vertexBufferLayout,
         vertexCount,
-        indexCount: indexData.length,
+        indexCount: uint16Indices.length,
+        indexFormat: 'uint16',
     };
 }
