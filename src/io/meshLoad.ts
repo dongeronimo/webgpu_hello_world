@@ -1,111 +1,168 @@
-import { GltfLoader } from 'gltf-loader-ts';
-///Loads a mesh into a vertex buffer and index buffer. 
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from 'three';
+
 export async function loadMesh(device: GPUDevice, path: string) {
-    const loader = new GltfLoader();
-    const asset = await loader.load(path);
+  // Create a promise that will resolve when the model is loaded
+  return new Promise<{
+    vertexBuffer: GPUBuffer;
+    indexBuffer: GPUBuffer;
+    vertexBufferLayout: GPUVertexBufferLayout;
+    vertexCount: number;
+    indexCount: number;
+    indexFormat: 'uint16' | 'uint32';
+  }>((resolve, reject) => {
+    const loader = new GLTFLoader();
     
-    // Get the first primitive from our Suzanne mesh
-    const primitive = asset.gltf.meshes[0].primitives[0];
-    
-    // In GLTF, primitive.attributes contains mappings like:
-    // { POSITION: <accessor>, NORMAL: <accessor>, TEXCOORD_0: <accessor> }
-    // We'll use these accessors to get the actual vertex data
-    
-    // Let's examine what attributes are available
-    console.log('Available attributes:', primitive.attributes);
-    
-    // First, let's get the vertex data from the accessors
-    // In GLTF, accessors point to specific regions in the buffer views
-    const positionData = await asset.accessorData(primitive.attributes.POSITION);
-    const normalData = await asset.accessorData(primitive.attributes.NORMAL);
-    const uvData = await asset.accessorData(primitive.attributes.TEXCOORD_0);
-    
-    // This gives us typed arrays containing our attribute data
-    console.log('Position data length:', positionData.length / 3, 'vertices');
-    
-    // Now we'll create an interleaved vertex buffer for better performance
-    // Each vertex will contain: position (3 floats) + normal (3 floats) + uv (2 floats)
-    const vertexCount = positionData.length / 3; // Each position has x, y, z
-    const stride = 8; // 3 (position) + 3 (normal) + 2 (uv) components per vertex
-    const vertexData = new Float32Array(vertexCount * stride);
-    
-    // Interleave the vertex data
-    for (let i = 0; i < vertexCount; i++) {
-        // Copy position (xyz)
-        vertexData[i * stride + 0] = positionData[i * 3 + 0]; // x
-        vertexData[i * stride + 1] = positionData[i * 3 + 1]; // y
-        vertexData[i * stride + 2] = positionData[i * 3 + 2]; // z
+    loader.load(
+      path,
+      (gltf) => {
+        // Get the first mesh from the scene
+        const mesh = gltf.scene.children.find(child => child.type === 'Mesh') as THREE.Mesh;
         
-        // Copy normal (xyz)
-        vertexData[i * stride + 3] = normalData[i * 3 + 0];
-        vertexData[i * stride + 4] = normalData[i * 3 + 1];
-        vertexData[i * stride + 5] = normalData[i * 3 + 2];
+        if (!mesh) {
+          reject(new Error('No mesh found in the GLTF file'));
+          return;
+        }
         
-        // Copy UV (xy)
-        vertexData[i * stride + 6] = uvData[i * 2 + 0];
-        vertexData[i * stride + 7] = uvData[i * 2 + 1];
-    }
-    
-    // Create and fill the vertex buffer
-    const vertexBuffer = device.createBuffer({
-        size: vertexData.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        // Unlike Vulkan, we don't need to explicitly manage memory
-        // WebGPU handles the memory allocation for us
-    });
-    device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-
-    // Now handle the index buffer
-    // In GLTF, primitive.indices points to an accessor for the index data
-    const indexData = await asset.accessorData(primitive.indices);
-    console.log('Index data type:', indexData.constructor.name);
-    console.log('Index data length:', indexData.length);
-    const indexCount = indexData.length / 2; 
-    console.log('Expected index count:', indexCount);
-    const uint16Indices = new Uint16Array(indexCount);
-    for (let i = 0; i < indexCount; i++) {
-        // Combine two bytes to form one Uint16 value
-        uint16Indices[i] = indexData[i*2] | (indexData[i*2+1] << 8);
-    }
-    console.log('Processed index count:', uint16Indices.length);
-
-    const indexBuffer = device.createBuffer({
-        size: uint16Indices.byteLength,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    });
-    device.queue.writeBuffer(indexBuffer, 0, uint16Indices);
-    
-    // Define how our vertex buffer should be interpreted by the pipeline
-    const vertexBufferLayout: GPUVertexBufferLayout = {
-        arrayStride: stride * Float32Array.BYTES_PER_ELEMENT, // Total bytes per vertex
-        attributes: [
-            {
-                // Position attribute - like layout(location = 0) in GLSL
-                format: 'float32x3', // Similar to VK_FORMAT_R32G32B32_SFLOAT
-                offset: 0,
-                shaderLocation: 0,
-            },
-            {
-                // Normal attribute
-                format: 'float32x3',
-                offset: 3 * Float32Array.BYTES_PER_ELEMENT,
-                shaderLocation: 1,
-            },
-            {
-                // UV attribute
-                format: 'float32x2',
-                offset: 6 * Float32Array.BYTES_PER_ELEMENT,
-                shaderLocation: 2,
+        // Get the geometry from the mesh
+        const geometry = mesh.geometry;
+        
+        // Get position attribute
+        const positionAttribute = geometry.getAttribute('position');
+        const positions = positionAttribute.array;
+        
+        // Get normal attribute
+        const normalAttribute = geometry.getAttribute('normal');
+        const normals = normalAttribute.array;
+        
+        // Get uv attribute (if available)
+        let uvs = new Float32Array(positionAttribute.count * 2);
+        const uvAttribute = geometry.getAttribute('uv');
+        if (uvAttribute) {
+          uvs = uvAttribute.array as Float32Array;
+        } else {
+          // Fill with zeros if UVs aren't available
+          for (let i = 0; i < uvs.length; i++) {
+            uvs[i] = 0;
+          }
+        }
+        
+        // Create an interleaved vertex buffer
+        const vertexCount = positionAttribute.count;
+        const stride = 8; // 3 (position) + 3 (normal) + 2 (uv)
+        const vertexData = new Float32Array(vertexCount * stride);
+        
+        // Interleave the data for better performance
+        for (let i = 0; i < vertexCount; i++) {
+          // Position (xyz)
+          vertexData[i * stride + 0] = positions[i * 3 + 0];
+          vertexData[i * stride + 1] = positions[i * 3 + 1];
+          vertexData[i * stride + 2] = positions[i * 3 + 2];
+          
+          // Normal (xyz)
+          vertexData[i * stride + 3] = normals[i * 3 + 0];
+          vertexData[i * stride + 4] = normals[i * 3 + 1];
+          vertexData[i * stride + 5] = normals[i * 3 + 2];
+          
+          // UV (xy)
+          vertexData[i * stride + 6] = uvs[i * 2 + 0];
+          vertexData[i * stride + 7] = uvs[i * 2 + 1];
+        }
+        
+        // Create vertex buffer
+        const vertexBuffer = device.createBuffer({
+          size: vertexData.byteLength,
+          usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        
+        // Copy data to the buffer
+        device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+        
+        // Get and process index data
+        let indices: Uint16Array | Uint32Array;
+        let indexFormat: 'uint16' | 'uint32' = 'uint16';
+        
+        if (geometry.index) {
+          const originalIndices = geometry.index.array;
+          
+          // Check if we need to convert to Uint16Array
+          if (originalIndices instanceof Uint32Array && vertexCount <= 65535) {
+            // We can safely convert to Uint16
+            indices = new Uint16Array(originalIndices.length);
+            for (let i = 0; i < originalIndices.length; i++) {
+              indices[i] = originalIndices[i];
             }
-        ],
-    };
-    
-    return {
-        vertexBuffer,
-        indexBuffer,
-        vertexBufferLayout,
-        vertexCount,
-        indexCount: uint16Indices.length,
-        indexFormat: 'uint16',
-    };
+          } else if (originalIndices instanceof Uint32Array) {
+            // Keep as Uint32
+            indices = originalIndices;
+            indexFormat = 'uint32';
+          } else {
+            // Already Uint16 or other format that can be used as Uint16
+            indices = originalIndices as Uint16Array;
+          }
+          
+          console.log('Index data type:', indices.constructor.name);
+          console.log('Index count:', indices.length);
+        } else {
+          // Generate sequential indices if not present
+          indices = new Uint16Array(vertexCount);
+          for (let i = 0; i < vertexCount; i++) {
+            indices[i] = i;
+          }
+        }
+        
+        // Create index buffer
+        const indexBuffer = device.createBuffer({
+          size: indices.byteLength,
+          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+        });
+        
+        // Copy data to the buffer
+        device.queue.writeBuffer(indexBuffer, 0, indices);
+        
+        // Define the vertex buffer layout
+        const vertexBufferLayout: GPUVertexBufferLayout = {
+          arrayStride: stride * Float32Array.BYTES_PER_ELEMENT,
+          attributes: [
+            {
+              // Position
+              format: 'float32x3',
+              offset: 0,
+              shaderLocation: 0,
+            },
+            {
+              // Normal
+              format: 'float32x3',
+              offset: 3 * Float32Array.BYTES_PER_ELEMENT,
+              shaderLocation: 1,
+            },
+            {
+              // UV
+              format: 'float32x2',
+              offset: 6 * Float32Array.BYTES_PER_ELEMENT,
+              shaderLocation: 2,
+            }
+          ],
+        };
+        
+        resolve({
+          vertexBuffer,
+          indexBuffer,
+          vertexBufferLayout,
+          vertexCount,
+          indexCount: indices.length,
+          indexFormat,
+        });
+      },
+      // Progress callback
+      (xhr) => {
+        console.log(`${(xhr.loaded / xhr.total * 100)}% loaded`);
+      },
+      // Error callback
+      (error) => {
+        console.error('Error loading GLTF file:', error);
+        reject(error);
+      }
+    );
+  });
 }

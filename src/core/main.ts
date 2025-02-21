@@ -35,7 +35,7 @@ export async function main(){
     const modelMatrix = mat4.create();
     mat4.perspective( projectionMatrix, Deg2Rad(45.0),canvas.width / canvas.height,0.1,100.0);
     // Set up camera position and orientation
-    const eye = vec3.fromValues(0, 1.5, 5);
+    const eye = vec3.fromValues(0, 0, 20);
     const center = vec3.fromValues(0, 0, 0);
     const up = vec3.fromValues(0, 1, 0);
     mat4.lookAt(viewMatrix, eye, center, up);
@@ -68,7 +68,7 @@ export async function main(){
             );
         }
         // Update rotation for animation
-        rotation += deltaTime * Deg2Rad(1);       
+        rotation += deltaTime * Deg2Rad(10);       
         // Create model matrix with rotation
         mat4.identity(modelMatrix);
         mat4.rotateY(modelMatrix, modelMatrix, rotation); 

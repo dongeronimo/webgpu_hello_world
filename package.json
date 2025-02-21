@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@types/gl-matrix": "^2.4.5",
+    "@types/three": "^0.173.0",
     "gl-matrix": "^3.4.3",
+    "three": "^0.173.0",
     "webgpu-my-first-game": "file:"
   }
 }
