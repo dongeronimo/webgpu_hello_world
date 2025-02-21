@@ -1,4 +1,6 @@
+import { createMesh } from "../engine/mesh";
 import { createCanvas, getWebGPUContext, initWebGPU } from "../engine/webgpu";
+import { loadShader } from "../io/shaderLoad";
 
 async function initializeGraphics() {
     const device = await initWebGPU();
@@ -9,5 +11,7 @@ async function initializeGraphics() {
 
 export async function main(){
     const {device, canvas, context, canvasFormat} = await initializeGraphics();
-    debugger;
+    const cube = await createMesh(device, "meshes/monkey.glb");
+    const shaderModule = await loadShader(device, '/shaders/basic.wgsl');
+    console.log(shaderModule);
 }
