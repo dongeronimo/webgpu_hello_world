@@ -9,8 +9,9 @@
             margin: 0;
             padding: 0;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            justify-content: baseline;
+            align-items: baseline;
+            flex-direction: column;
             min-height: 100vh;
             background-color: #1a1a1a;
         }
@@ -23,6 +24,12 @@
     </style>
 </head>
 <body>
+    <div>
+        <select id="selectChangeResolution" onchange="">
+            <option value="800x600">800x600</option>
+            <option value="1024x768">1024x768</option>
+        </select>
+    </div>
     <canvas></canvas>
     <!-- 
         In Vite, we use the type="module" attribute to enable ES modules.
@@ -30,7 +37,7 @@
         This allows us to use TypeScript and modern JavaScript features.
     -->
     <script type="module">
-      import {main} from "./src/core/main.ts";
+      import {main, changeResolution} from "./src/core/main.ts";
       window.addEventListener('load', () => {
           // Since our graphics initialization is async, we need to catch any errors
           main().catch(err => {
@@ -40,6 +47,20 @@
               document.body.innerHTML = `<pre style="color: red">${err}</pre>`;
           });
       });
+      const selectChangeResolution = document.getElementById('selectChangeResolution');
+      selectChangeResolution.addEventListener('change', (event)=>{
+        const selectedValue = event.target.value;
+        switch(selectedValue) {
+            case "800x600":
+                changeResolution(800, 600);
+                break;
+            case "1024x768":
+                changeResolution(1024, 762);
+                break;
+            default:
+                alert("selectChangeResolution crazy value");
+        }
+      })
     </script>
 </body>
 </html>

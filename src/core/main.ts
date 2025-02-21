@@ -11,6 +11,8 @@ let canvas: HTMLCanvasElement;
 let ctx: GPUCanvasContext;
 let format: GPUTextureFormat;
 let cubeMesh: Mesh;
+let depthTexture: GPUTexture;
+let projectionMatrix: mat4;
 
 async function initializeGraphics() {
     const _device = await initWebGPU();
@@ -29,13 +31,13 @@ export async function main(){
     cubeMesh = await createMesh(device, "meshes/monkey.glb");
     const standardPipeline = new StandardPipeline(device, cubeMesh.vertexBufferLayout, 100);
     await standardPipeline.initialize();
-    let depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
-    const projectionMatrix = mat4.create();
+    depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
+    projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
     const modelMatrix = mat4.create();
     mat4.perspective( projectionMatrix, Deg2Rad(45.0),canvas.width / canvas.height,0.1,100.0);
     // Set up camera position and orientation
-    const eye = vec3.fromValues(0, 0, 20);
+    const eye = vec3.fromValues(0, 0, 7);
     const center = vec3.fromValues(0, 0, 0);
     const up = vec3.fromValues(0, 1, 0);
     mat4.lookAt(viewMatrix, eye, center, up);
@@ -45,28 +47,7 @@ export async function main(){
     function frame(currentTime: number) {
         const deltaTime = (currentTime - lastTime) / 1000.0;
         lastTime = currentTime;
-        // Handle canvas resize if needed
-        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
 
-            // Recreate depth texture when canvas is resized
-            depthTexture.destroy();
-            depthTexture = device.createTexture({
-                size: [canvas.width, canvas.height],
-                format: 'depth24plus',
-                usage: GPUTextureUsage.RENDER_ATTACHMENT
-            });
-
-            // Update projection matrix with new aspect ratio
-            mat4.perspective(
-                projectionMatrix,
-                Math.PI / 4,
-                canvas.width / canvas.height,
-                0.1,
-                100.0
-            );
-        }
         // Update rotation for animation
         rotation += deltaTime * Deg2Rad(10);       
         // Create model matrix with rotation
@@ -115,4 +96,28 @@ export async function main(){
     }
     // Schedule next frame
     requestAnimationFrame(frame);
+}
+
+export function changeResolution(w:number, h:number)
+{
+    // Update both the canvas dimensions and style
+    canvas.width = w;
+    canvas.height = h;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    
+    // Recreate the depth texture with the new dimensions immediately
+    if (depthTexture) {
+        depthTexture.destroy();
+        depthTexture = makeDepthTextureForRenderAttachment(device, w, h);
+    }
+    
+    // Update projection matrix with new aspect ratio
+    mat4.perspective(
+        projectionMatrix,
+        Deg2Rad(45.0),
+        w / h,
+        0.1,
+        100.0
+    );
 }
