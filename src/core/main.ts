@@ -1,6 +1,6 @@
-import { mat4, vec3 } from "gl-matrix";
+import { mat4, quat, vec3 } from "gl-matrix";
 import { createMesh, Mesh } from "../engine/mesh";
-import { StandardPipeline } from "../engine/pipeline/standardPipeline";
+import { StandardPipeline } from "../engine/pipeline/standardPipeline";     
 import { makeDepthTextureForRenderAttachment } from "../engine/textures";
 import { createCanvas, getWebGPUContext, initWebGPU } from "../engine/webgpu";
 import { loadShader } from "../io/shaderLoad";
@@ -24,7 +24,31 @@ async function initializeGraphics() {
     format = canvasFormat;
 }
 
+class Transform {
+    private pos:vec3 = vec3.create();
+    private scale:vec3 = [1.0, 1.0, 1.0];
+    private rotation:quat = quat.create();
+    private localTransform:mat4 = mat4.create();
+    public GetLocalTransform():mat4 {return this.localTransform;}
+    constructor(){
+        this.calculateLocalTransform();
+    }
+    private calculateLocalTransform():mat4 {
+        mat4.identity(this.localTransform);
+        // Order matters: Scale -> Rotate -> Translate
+        mat4.fromQuat(this.localTransform, this.rotation);      // Set rotation
+        mat4.scale(this.localTransform, this.localTransform, this.scale);    // Apply scale
+        mat4.translate(this.localTransform, this.localTransform, this.pos);  // Apply translation
+        return this.localTransform;
+    }
 
+    public setPosition(p:vec3){
+        this.pos[0] = p[0];
+        this.pos[1] = p[1];
+        this.pos[2] = p[2];
+        this.calculateLocalTransform();
+    }
+}
 export async function main(){
     //inits canvas, device, context and format
     await initializeGraphics();
@@ -34,32 +58,34 @@ export async function main(){
     depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
     projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
-    const modelMatrix = mat4.create();
     mat4.perspective( projectionMatrix, Deg2Rad(45.0),canvas.width / canvas.height,0.1,100.0);
     // Set up camera position and orientation
-    const eye = vec3.fromValues(0, 0, 7);
+    const eye = vec3.fromValues(15, 15, 15);
     const center = vec3.fromValues(0, 0, 0);
     const up = vec3.fromValues(0, 1, 0);
     mat4.lookAt(viewMatrix, eye, center, up);
     // Animation variables
-    let rotation = 0;
     let lastTime = 0;
+    //create some transforms
+    let transforms = new Array<Transform>();
+    for(let i=0; i<10; i++){
+        const x = i % 5;
+        const y = i / 5;
+        const pos:vec3 = [x*2, y*2, 0];
+        const transform = new Transform();
+        transform.setPosition(pos);
+        transforms.push(transform);
+    }
     function frame(currentTime: number) {
         const deltaTime = (currentTime - lastTime) / 1000.0;
         lastTime = currentTime;
 
-        // Update rotation for animation
-        rotation += deltaTime * Deg2Rad(10);       
-        // Create model matrix with rotation
-        mat4.identity(modelMatrix);
-        mat4.rotateY(modelMatrix, modelMatrix, rotation); 
-        // Update MVP data in the pipeline
-        standardPipeline.updateObjectMvp(
-            0, 
-            modelMatrix as Float32Array, 
-            viewMatrix as Float32Array, 
-            projectionMatrix as Float32Array
-        );
+        standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
+        // Update all transforms
+        transforms.forEach((transform, index) => {
+            standardPipeline.updateModelMatrix(index, transform.GetLocalTransform());
+        });
+
         // Begin encoding commands
         const commandEncoder = device.createCommandEncoder();
         // Get the current texture view from the context
@@ -83,10 +109,24 @@ export async function main(){
         renderPass.setPipeline(standardPipeline.getPipeline());
         renderPass.setVertexBuffer(0, cubeMesh.vertexBuffer);
         renderPass.setIndexBuffer(cubeMesh.indexBuffer, 'uint16');
+        // Draw each instance
+        transforms.forEach((_, index) => {
+            const dynamicOffset = index * standardPipeline.getDynamicOffsetSize();
+            renderPass.setBindGroup(0, standardPipeline.getBindGroup('transform'), [dynamicOffset]);
+            renderPass.drawIndexed(cubeMesh.indexCount);
+        });
+        // transforms.forEach( (_, index)=>{
+        //     standardPipeline.setBindGroup(renderPass, index);
+        //     renderPass.drawIndexed(cubeMesh.indexCount);
+        // });
+        // standardPipeline.setBindGroup(renderPass, )
         // Set the bind group with dynamic offset for this object
-        renderPass.setBindGroup(0, standardPipeline.getBindGroup('mvp'), [0]); // Use offset 0 for our single object
+        // If each MVP matrix is 64 bytes (4x4 matrix = 16 floats * 4 bytes)
+        // You still need to align to 256 bytes
+        // const idx = transforms.map((_, index) => index );
+        // renderPass.setBindGroup(0, standardPipeline.getBindGroup('mvp'), offsets); // Use offset 0 for our single object
         // Draw the mesh
-        renderPass.drawIndexed(cubeMesh.indexCount);
+        // renderPass.drawIndexed(cubeMesh.indexCount);
         // End the render pass and submit the command buffer
         renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
