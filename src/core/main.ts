@@ -34,14 +34,26 @@ class Transform {
         this.calculateLocalTransform();
     }
     private calculateLocalTransform():mat4 {
+        // Reset to identity
         mat4.identity(this.localTransform);
-        // Order matters: Scale -> Rotate -> Translate
-        mat4.fromQuat(this.localTransform, this.rotation);      // Set rotation
-        mat4.scale(this.localTransform, this.localTransform, this.scale);    // Apply scale
-        mat4.translate(this.localTransform, this.localTransform, this.pos);  // Apply translation
+        
+        // First translate to position in world
+        mat4.translate(this.localTransform, this.localTransform, this.pos);
+        
+        // Then apply rotation at that position
+        const rotationMatrix = mat4.create();
+        mat4.fromQuat(rotationMatrix, this.rotation);
+        mat4.multiply(this.localTransform, this.localTransform, rotationMatrix);
+        
+        // Finally scale
+        mat4.scale(this.localTransform, this.localTransform, this.scale);
+
         return this.localTransform;
     }
-
+    public rotationFromAngleAxis(angleInRad:number, axis:vec3){
+        quat.setAxisAngle(this.rotation, axis, angleInRad);
+        this.calculateLocalTransform();
+    }
     public setPosition(p:vec3){
         this.pos[0] = p[0];
         this.pos[1] = p[1];
@@ -60,7 +72,7 @@ export async function main(){
     const viewMatrix = mat4.create();
     mat4.perspective( projectionMatrix, Deg2Rad(45.0),canvas.width / canvas.height,0.1,100.0);
     // Set up camera position and orientation
-    const eye = vec3.fromValues(15, 15, 15);
+    const eye = vec3.fromValues(15, 0, 15);
     const center = vec3.fromValues(0, 0, 0);
     const up = vec3.fromValues(0, 1, 0);
     mat4.lookAt(viewMatrix, eye, center, up);
@@ -71,9 +83,10 @@ export async function main(){
     for(let i=0; i<10; i++){
         const x = i % 5;
         const y = i / 5;
-        const pos:vec3 = [x*2, y*2, 0];
+        const pos:vec3 = [x*3-5, y*3-5, 0];
         const transform = new Transform();
         transform.setPosition(pos);
+        transform.rotationFromAngleAxis(Deg2Rad(45.0), [1.0, 0,0]);
         transforms.push(transform);
     }
     function frame(currentTime: number) {
@@ -83,6 +96,7 @@ export async function main(){
         standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
         // Update all transforms
         transforms.forEach((transform, index) => {
+            transform.rotationFromAngleAxis(Deg2Rad(lastTime/20), [1.0, 0,0]);
             standardPipeline.updateModelMatrix(index, transform.GetLocalTransform());
         });
 
@@ -115,19 +129,6 @@ export async function main(){
             renderPass.setBindGroup(0, standardPipeline.getBindGroup('transform'), [dynamicOffset]);
             renderPass.drawIndexed(cubeMesh.indexCount);
         });
-        // transforms.forEach( (_, index)=>{
-        //     standardPipeline.setBindGroup(renderPass, index);
-        //     renderPass.drawIndexed(cubeMesh.indexCount);
-        // });
-        // standardPipeline.setBindGroup(renderPass, )
-        // Set the bind group with dynamic offset for this object
-        // If each MVP matrix is 64 bytes (4x4 matrix = 16 floats * 4 bytes)
-        // You still need to align to 256 bytes
-        // const idx = transforms.map((_, index) => index );
-        // renderPass.setBindGroup(0, standardPipeline.getBindGroup('mvp'), offsets); // Use offset 0 for our single object
-        // Draw the mesh
-        // renderPass.drawIndexed(cubeMesh.indexCount);
-        // End the render pass and submit the command buffer
         renderPass.end();
         device.queue.submit([commandEncoder.finish()]);
         
