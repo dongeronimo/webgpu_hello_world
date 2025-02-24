@@ -5,13 +5,15 @@ import { makeDepthTextureForRenderAttachment } from "../engine/textures";
 import { createCanvas, getWebGPUContext, initWebGPU } from "../engine/webgpu";
 import { loadShader } from "../io/shaderLoad";
 import { Deg2Rad } from "./math";
-import { GameObject, Transform } from "../engine/gameObject";
+import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameObject";
+import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
+import { array } from "three/tsl";
 
 let device: GPUDevice;
 let canvas: HTMLCanvasElement;
 let ctx: GPUCanvasContext;
 let format: GPUTextureFormat;
-let cubeMesh: Mesh;
+let monkeyMesh: Mesh;
 let depthTexture: GPUTexture;
 let projectionMatrix: mat4;
 
@@ -25,48 +27,11 @@ async function initializeGraphics() {
     format = canvasFormat;
 }
 
-// class Transform {
-//     private pos:vec3 = vec3.create();
-//     private scale:vec3 = [1.0, 1.0, 1.0];
-//     private rotation:quat = quat.create();
-//     private localTransform:mat4 = mat4.create();
-//     public GetLocalTransform():mat4 {return this.localTransform;}
-//     constructor(){
-//         this.calculateLocalTransform();
-//     }
-//     private calculateLocalTransform():mat4 {
-//         // Reset to identity
-//         mat4.identity(this.localTransform);
-        
-//         // First translate to position in world
-//         mat4.translate(this.localTransform, this.localTransform, this.pos);
-        
-//         // Then apply rotation at that position
-//         const rotationMatrix = mat4.create();
-//         mat4.fromQuat(rotationMatrix, this.rotation);
-//         mat4.multiply(this.localTransform, this.localTransform, rotationMatrix);
-        
-//         // Finally scale
-//         mat4.scale(this.localTransform, this.localTransform, this.scale);
-
-//         return this.localTransform;
-//     }
-//     public rotationFromAngleAxis(angleInRad:number, axis:vec3){
-//         quat.setAxisAngle(this.rotation, axis, angleInRad);
-//         this.calculateLocalTransform();
-//     }
-//     public setPosition(p:vec3){
-//         this.pos[0] = p[0];
-//         this.pos[1] = p[1];
-//         this.pos[2] = p[2];
-//         this.calculateLocalTransform();
-//     }
-// }
 export async function main(){
     //inits canvas, device, context and format
     await initializeGraphics();
-    cubeMesh = await createMesh(device, "meshes/monkey.glb");
-    const standardPipeline = new StandardPipeline(device, cubeMesh.vertexBufferLayout, 100);
+    monkeyMesh = await createMesh(device, "meshes/monkey.glb");
+    const standardPipeline = new StandardPipeline(device, monkeyMesh.vertexBufferLayout, 100);
     await standardPipeline.initialize();
     depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
     projectionMatrix = mat4.create();
@@ -77,50 +42,49 @@ export async function main(){
     const center = vec3.fromValues(0, 0, 0);
     const up = vec3.fromValues(0, 1, 0);
     mat4.lookAt(viewMatrix, eye, center, up);
-    // Animation variables
-    let lastTime = 0;
-    //create some transforms
+    //create the world
     let gameObjects = new Array<GameObject>();
+    const root: GameObject = new GameObject("root");
+    new Transform(root);
+    new RotateBehaviour(root);
+    gameObjects.push(root);
     for(let i=0;i<10; i++){
         const newGameObject = new GameObject(`monkey ${i}`);
+        newGameObject.setParent(root);
         const transform = new Transform(newGameObject);
         const x = i % 5;
         const y = i / 5;
         const pos:vec3 = [x*3-5, y*3-5, 0];
         transform.setPosition(pos);
         transform.rotationFromAngleAxis(Deg2Rad(45.0), [1.0, 0,0]);
-
+        if(i%2==0){
+            new RotateBehaviour(newGameObject);
+        }
         gameObjects.push(newGameObject);
     }
-    // let transforms = new Array<Transform>();
-    // for(let i=0; i<10; i++){
-    //     const x = i % 5;
-    //     const y = i / 5;
-    //     const pos:vec3 = [x*3-5, y*3-5, 0];
-    //     const transform = new Transform();
-    //     transform.setPosition(pos);
-    //     transform.rotationFromAngleAxis(Deg2Rad(45.0), [1.0, 0,0]);
-    //     transforms.push(transform);
-    // }
+    let lastTime = 0;
+    const behavioursTable = new Array<string>();
+    behavioursTable.push(RotateBehaviour.name);
     function frame(currentTime: number) {
         const deltaTime = (currentTime - lastTime) / 1000.0;
         lastTime = currentTime;
-        //update view and projection uniforms
+        //start behaviours that hasn't been started yet
+        const behaviours = gameObjects.map((go)=>behavioursTable.map(b=>go.getComponent(b)! as Behaviour))
+            .flatMap(bLst=> bLst.map(b=>b))
+            .filter(go=>go!=null || go!=undefined);
+        behaviours.filter(b=>!b.IsStarted()).forEach(b=>b.start());    
+        //update behaviours
+        behaviours.forEach(b=>b.update(deltaTime));
+        //update view and projection uniforms in the gpu
         standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
-        //update all model uniforms
-        const transforms = gameObjects.map( (go, i)=>{
+        //update all model uniforms in the gpu
+        const transforms = gameObjects.map( (go)=>{
             const transform = go.getComponent(Transform.name)! as Transform;
             return transform;
         });
         transforms.forEach( (t,i)=>{
-            standardPipeline.updateModelMatrix(i, t.GetLocalTransform());
+            standardPipeline.updateModelMatrix(i, t.getWorldTransform());
         });
-        // Update all transforms
-        // transforms.forEach((transform, index) => {
-        //     transform.rotationFromAngleAxis(Deg2Rad(lastTime/20), [1.0, 0,0]);
-        //     standardPipeline.updateModelMatrix(index, transform.GetLocalTransform());
-        // });
-
         // Begin encoding commands
         const commandEncoder = device.createCommandEncoder();
         // Get the current texture view from the context
@@ -142,13 +106,13 @@ export async function main(){
         });
         // Set the pipeline and vertex/index buffers
         renderPass.setPipeline(standardPipeline.getPipeline());
-        renderPass.setVertexBuffer(0, cubeMesh.vertexBuffer);
-        renderPass.setIndexBuffer(cubeMesh.indexBuffer, 'uint16');
+        renderPass.setVertexBuffer(0, monkeyMesh.vertexBuffer);
+        renderPass.setIndexBuffer(monkeyMesh.indexBuffer, 'uint16');
         // Draw each instance
         transforms.forEach((_, index) => {
             const dynamicOffset = index * standardPipeline.getDynamicOffsetSize();
             renderPass.setBindGroup(0, standardPipeline.getBindGroup('transform'), [dynamicOffset]);
-            renderPass.drawIndexed(cubeMesh.indexCount);
+            renderPass.drawIndexed(monkeyMesh.indexCount);
         });
         renderPass.end();
         device.queue.submit([commandEncoder.finish()]);

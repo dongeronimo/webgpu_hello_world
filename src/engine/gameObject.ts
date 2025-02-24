@@ -1,4 +1,5 @@
 import { mat4, quat, vec3 } from "gl-matrix";
+import { Mesh } from "./mesh";
 
 let counter:number = 0;
 
@@ -6,6 +7,11 @@ export class GameObject {
     public readonly id:number;
     public readonly name:string;
     private components:Map<string, Component>= new Map();
+    private children:Array<GameObject> = new Array();
+    private parent:GameObject|null = null;
+    public GetParent():GameObject|null {
+        return this.parent; 
+    }
     constructor(name:string){
         this.id = ++counter;
         this.name = name;
@@ -17,6 +23,10 @@ export class GameObject {
     public getComponent(typename:string) : Component|undefined{
         return this.components.get(typename);
     }
+    public setParent(p:GameObject){
+        this.parent = p;
+        this.parent.children.push(p);
+    }
 }
 
 export class Component {
@@ -25,11 +35,30 @@ export class Component {
         this.owner = owner;
         owner.addComponent(this);
     }
-
 }
 
-export class Behaviour extends Component {
 
+//////DO NOT USE THIS FOR NOW/////
+export class MeshComponent extends Component {
+    public readonly mesh:Mesh;
+    constructor(owner:GameObject, mesh:Mesh){
+        super(owner);
+        this.mesh = mesh;
+    }
+}
+//////////////////////////////////
+export class Behaviour extends Component {
+    protected alreadyStarted:boolean = false;
+    public IsStarted():boolean{return this.alreadyStarted;}
+    constructor(owner:GameObject){
+        super(owner);
+    }
+    public start(){
+        this.alreadyStarted = true;
+    }
+    public update(deltaTime:number){
+
+    }
 }
 
 export class Transform extends Component {
@@ -37,7 +66,7 @@ export class Transform extends Component {
     private scale:vec3 = [1.0, 1.0, 1.0];
     private rotation:quat = quat.create();
     private localTransform:mat4 = mat4.create();
-    public GetLocalTransform():mat4 {return this.localTransform;}
+    public getLocalTransform():mat4 {return this.localTransform;}
     constructor(owner:GameObject){
         super(owner);
         this.calculateLocalTransform();
@@ -68,5 +97,26 @@ export class Transform extends Component {
         this.pos[1] = p[1];
         this.pos[2] = p[2];
         this.calculateLocalTransform();
-    }    
+    }   
+    
+    public getWorldTransform():mat4{
+        const worldTransform = mat4.create();
+    
+        // Start with the local transform
+        mat4.copy(worldTransform, this.localTransform);
+        
+        // If this object has a parent, multiply by the parent's world transform
+        const parent = this.owner.GetParent();
+        if (parent) {
+            // Get the parent's transform component
+            const parentTransform = parent.getComponent("Transform") as Transform;
+            if (parentTransform) {
+                // Multiply local transform by parent's world transform
+                const parentWorldTransform = parentTransform.getWorldTransform();
+                mat4.multiply(worldTransform, parentWorldTransform, worldTransform);
+            }
+        }
+        
+        return worldTransform;    
+    }
 }
