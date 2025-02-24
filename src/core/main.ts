@@ -60,21 +60,24 @@ export async function main(){
         if(i%2==0){
             new RotateBehaviour(newGameObject);
         }
+        new MeshComponent(newGameObject, monkeyMesh);
         gameObjects.push(newGameObject);
     }
     let lastTime = 0;
     const behavioursTable = new Array<string>();
     behavioursTable.push(RotateBehaviour.name);
     function frame(currentTime: number) {
+        /////////////handle time: calculate delta time./////////////
         const deltaTime = (currentTime - lastTime) / 1000.0;
         lastTime = currentTime;
-        //start behaviours that hasn't been started yet
+        /////////////start behaviours that hasn't been started yet///////////
         const behaviours = gameObjects.map((go)=>behavioursTable.map(b=>go.getComponent(b)! as Behaviour))
             .flatMap(bLst=> bLst.map(b=>b))
             .filter(go=>go!=null || go!=undefined);
         behaviours.filter(b=>!b.IsStarted()).forEach(b=>b.start());    
-        //update behaviours
+        /////////////update behaviours////////////////////////////////
         behaviours.forEach(b=>b.update(deltaTime));
+        /////////////pass the uniforms to standardPipeline buffers/////////////
         //update view and projection uniforms in the gpu
         standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
         //update all model uniforms in the gpu
@@ -85,7 +88,7 @@ export async function main(){
         transforms.forEach( (t,i)=>{
             standardPipeline.updateModelMatrix(i, t.getWorldTransform());
         });
-        // Begin encoding commands
+        /////////////Begin encoding commands//////////////
         const commandEncoder = device.createCommandEncoder();
         // Get the current texture view from the context
         const textureView = ctx.getCurrentTexture().createView();
@@ -108,10 +111,14 @@ export async function main(){
         renderPass.setPipeline(standardPipeline.getPipeline());
         renderPass.setVertexBuffer(0, monkeyMesh.vertexBuffer);
         renderPass.setIndexBuffer(monkeyMesh.indexBuffer, 'uint16');
-        // Draw each instance
-        transforms.forEach((_, index) => {
-            const dynamicOffset = index * standardPipeline.getDynamicOffsetSize();
-            renderPass.setBindGroup(0, standardPipeline.getBindGroup('transform'), [dynamicOffset]);
+        // Draw each mesh
+        transforms.map( (t,i)=>{
+            const dynamicOffset : number= i * standardPipeline.getDynamicOffsetSize();
+            const mesh = t.owner.getComponent(MeshComponent.name);
+            return {offset:dynamicOffset, mesh:mesh};
+        }).filter( x => x.mesh != null && x.mesh != undefined)
+        .forEach(x=>{
+            renderPass.setBindGroup(0, standardPipeline.getBindGroup('transform'), [x.offset]);
             renderPass.drawIndexed(monkeyMesh.indexCount);
         });
         renderPass.end();

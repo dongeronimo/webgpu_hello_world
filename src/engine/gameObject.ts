@@ -38,7 +38,6 @@ export class Component {
 }
 
 
-//////DO NOT USE THIS FOR NOW/////
 export class MeshComponent extends Component {
     public readonly mesh:Mesh;
     constructor(owner:GameObject, mesh:Mesh){
@@ -46,7 +45,7 @@ export class MeshComponent extends Component {
         this.mesh = mesh;
     }
 }
-//////////////////////////////////
+
 export class Behaviour extends Component {
     protected alreadyStarted:boolean = false;
     public IsStarted():boolean{return this.alreadyStarted;}
