@@ -7,7 +7,9 @@ import { loadShader } from "../io/shaderLoad";
 import { Deg2Rad } from "./math";
 import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameObject";
 import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
-import { array } from "three/tsl";
+import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
+import { GpuPickerRenderPass } from "../engine/renderPasses/GpuPickerRenderPass";
+
 
 let device: GPUDevice;
 let canvas: HTMLCanvasElement;
@@ -33,6 +35,9 @@ export async function main(){
     monkeyMesh = await createMesh(device, "meshes/monkey.glb");
     const standardPipeline = new StandardPipeline(device, monkeyMesh.vertexBufferLayout, 100);
     await standardPipeline.initialize();
+    const pickerPipeline = new PickerPipeline(device, "rgba8unorm", 100);
+    await pickerPipeline.initialize();
+
     depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
     projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
@@ -46,7 +51,7 @@ export async function main(){
     let gameObjects = new Array<GameObject>();
     const root: GameObject = new GameObject("root");
     new Transform(root);
-    new RotateBehaviour(root);
+    //new RotateBehaviour(root);
     gameObjects.push(root);
     for(let i=0;i<10; i++){
         const newGameObject = new GameObject(`monkey ${i}`);
@@ -66,6 +71,24 @@ export async function main(){
     let lastTime = 0;
     const behavioursTable = new Array<string>();
     behavioursTable.push(RotateBehaviour.name);
+
+    //////canvas mouse event listeners//////
+    const mouse = {
+        x:-1, 
+        y:-1,
+        type: "",
+        button: -1
+    };
+    canvas.addEventListener("click", (ev)=>{
+        mouse.x = ev.x;
+        mouse.y = ev.y;
+        mouse.type = "click";
+        mouse.button = ev.button;
+        pendingPickRequest = true;
+    });
+    let pickOperationActive = false;
+    let pendingPickRequest = false; 
+    const pickerRenderPass = new GpuPickerRenderPass(device, "rgba8unorm", canvas.width, canvas.height);
     function frame(currentTime: number) {
         /////////////handle time: calculate delta time./////////////
         const deltaTime = (currentTime - lastTime) / 1000.0;
@@ -80,20 +103,24 @@ export async function main(){
         /////////////pass the uniforms to standardPipeline buffers/////////////
         //update view and projection uniforms in the gpu
         standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
+        pickerPipeline.updateViewProjection(viewMatrix, projectionMatrix);
         //update all model uniforms in the gpu
         const transforms = gameObjects.map( (go)=>{
             const transform = go.getComponent(Transform.name)! as Transform;
             return transform;
         });
         transforms.forEach( (t,i)=>{
-            standardPipeline.updateModelMatrix(i, t.getWorldTransform());
+            const worldTransform = t.getWorldTransform();
+            standardPipeline.updateModelMatrix(i, worldTransform);
+            pickerPipeline.updateObjectSpecificUniformBuffer(i, worldTransform, t.owner.id);
         });
         /////////////Begin encoding commands//////////////
         const commandEncoder = device.createCommandEncoder();
+        commandEncoder.label ="mainCommandEncoder";
         // Get the current texture view from the context
         const textureView = ctx.getCurrentTexture().createView();
-        // Start a render pass
-        const renderPass = commandEncoder.beginRenderPass({
+        // Start the main render passs
+        const mainRenderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{
                 view: textureView,
                 clearValue: { r: 0.1, g: 0.1, b: 0.2, a: 1.0 },
@@ -108,22 +135,72 @@ export async function main(){
             }
         });
         // Set the pipeline and vertex/index buffers
-        renderPass.setPipeline(standardPipeline.getPipeline());
-        renderPass.setVertexBuffer(0, monkeyMesh.vertexBuffer);
-        renderPass.setIndexBuffer(monkeyMesh.indexBuffer, 'uint16');
+        mainRenderPassEncoder.setPipeline(standardPipeline.getPipeline());
         // Draw each mesh
         transforms.map( (t,i)=>{
             const dynamicOffset : number= i * standardPipeline.getDynamicOffsetSize();
-            const mesh = t.owner.getComponent(MeshComponent.name);
+            const mesh = t.owner.getComponent(MeshComponent.name) as MeshComponent;
             return {offset:dynamicOffset, mesh:mesh};
         }).filter( x => x.mesh != null && x.mesh != undefined)
         .forEach(x=>{
-            renderPass.setBindGroup(0, standardPipeline.getBindGroup('transform'), [x.offset]);
-            renderPass.drawIndexed(monkeyMesh.indexCount);
+            mainRenderPassEncoder.setBindGroup(0, standardPipeline.getBindGroup('transform'), [x.offset]);
+            mainRenderPassEncoder.setVertexBuffer(0, x.mesh.mesh.vertexBuffer);
+            mainRenderPassEncoder.setIndexBuffer(x.mesh.mesh.indexBuffer, 'uint16');    
+            mainRenderPassEncoder.drawIndexed(x.mesh.mesh.indexCount);
         });
-        renderPass.end();
+        mainRenderPassEncoder.end();///end the main render pass
         device.queue.submit([commandEncoder.finish()]);
-        
+
+        // Handle picking if requested and not already in progress
+        if (pendingPickRequest && !pickOperationActive) {
+            pendingPickRequest = false;
+            pickOperationActive = true;
+            const pickerCommandEncoder = device.createCommandEncoder();
+            pickerCommandEncoder.label = "PickerCommandEncoder";
+            // start the picker render pass
+            const gpuPickerRenderPassEncoder = pickerCommandEncoder.beginRenderPass({
+                label: "gpuPickerRenderPassEncoder",
+                colorAttachments: [{
+                    view: pickerRenderPass.ColorTextureView(),
+                    clearValue: {r:0, g:0, b:0, a:0.0},
+                    loadOp: 'clear',
+                    storeOp:'store',
+                }],
+                depthStencilAttachment: {
+                    view: pickerRenderPass.DepthTextureView(),
+                    depthClearValue: 1.0,
+                    depthLoadOp: 'clear',
+                    depthStoreOp: 'store'
+                }
+            });
+            gpuPickerRenderPassEncoder.setPipeline(pickerPipeline.getPipeline());
+
+            pickerRenderPass.setViewport(mouse.x, mouse.y, gpuPickerRenderPassEncoder);
+            //render the scene to do picking
+            transforms.map( (t,i)=>{
+                const dynamicOffset : number= i * pickerPipeline.getDynamicOffsetSize();
+                const mesh = t.owner.getComponent(MeshComponent.name) as MeshComponent;
+                return {offset:dynamicOffset, mesh:mesh};
+            }).filter( x => x.mesh != null && x.mesh != undefined)
+            .forEach(x=>{
+                gpuPickerRenderPassEncoder.setBindGroup(0, 
+                    pickerPipeline.getBindGroup('main'), [x.offset]);
+                gpuPickerRenderPassEncoder.setVertexBuffer(0, x.mesh.mesh.vertexBuffer);
+                gpuPickerRenderPassEncoder.setIndexBuffer(x.mesh.mesh.indexBuffer, 'uint16');    
+                gpuPickerRenderPassEncoder.drawIndexed(x.mesh.mesh.indexCount);
+            });
+            // end the picker render pass
+            gpuPickerRenderPassEncoder.end();
+            pickerRenderPass.readTexture(pickerCommandEncoder, mouse.x, mouse.y);
+            device.queue.submit([pickerCommandEncoder.finish()]);
+            // read the result
+
+            pickerRenderPass.readPickedObjectId().then((value:number)=>{
+                console.log(`Object id: ${value}`)
+                pendingPickRequest = false;
+                pickOperationActive = false;
+            })
+        }        
         // Schedule next frame
         requestAnimationFrame(frame);
     }
