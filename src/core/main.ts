@@ -9,7 +9,7 @@ import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameO
 import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
 import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
 import { GpuPickerService } from "../engine/renderPasses/GpuPickerRenderPass";
-
+import "../editor/reactInit";
 
 let device: GPUDevice;
 let canvas: HTMLCanvasElement;
