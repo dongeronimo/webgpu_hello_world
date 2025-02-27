@@ -8,7 +8,7 @@ import { Deg2Rad } from "./math";
 import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameObject";
 import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
 import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
-import { GpuPickerRenderPass } from "../engine/renderPasses/GpuPickerRenderPass";
+import { GpuPickerService } from "../engine/renderPasses/GpuPickerRenderPass";
 
 
 let device: GPUDevice;
@@ -18,7 +18,7 @@ let format: GPUTextureFormat;
 let monkeyMesh: Mesh;
 let depthTexture: GPUTexture;
 let projectionMatrix: mat4;
-let gpuPicker: GpuPickerRenderPass;
+let gpuPicker: GpuPickerService;
 async function initializeGraphics() {
     const _device = await initWebGPU();
     const _canvas = createCanvas();
@@ -87,7 +87,7 @@ export async function main(){
         gpuPicker.setPendingPickRequest();
     });
 
-    gpuPicker = new GpuPickerRenderPass(device, "rgba8unorm", canvas.width, canvas.height);
+    gpuPicker = new GpuPickerService(device, "rgba8unorm", canvas.width, canvas.height);
     function frame(currentTime: number) {
         /////////////handle time: calculate delta time./////////////
         const deltaTime = (currentTime - lastTime) / 1000.0;
@@ -198,5 +198,5 @@ export function changeResolution(w:number, h:number)
         100.0
     );
     gpuPicker.destroy();
-    gpuPicker = new GpuPickerRenderPass(device,"rgba8unorm", w, h );
+    gpuPicker = new GpuPickerService(device,"rgba8unorm", w, h );
 }

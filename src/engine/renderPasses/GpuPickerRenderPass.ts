@@ -2,7 +2,7 @@ import { Mesh } from "../mesh";
 import { BasePipeline } from "../pipeline/basePipeline";
 import { PickerPipeline } from "../pipeline/pickerPipeline";
 
-export class GpuPickerRenderPass {
+export class GpuPickerService {
     private colorTexture: GPUTexture;
     private colorTextureView: GPUTextureView;
     public getColorTextureView():GPUTextureView { return this.colorTextureView;}
