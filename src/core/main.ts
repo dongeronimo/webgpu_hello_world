@@ -8,7 +8,7 @@ import { Deg2Rad } from "./math";
 import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameObject";
 import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
 import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
-import { GpuPickerRenderPass } from "../engine/renderPasses/GpuPickerRenderPass";
+import { GpuPickerService } from "../engine/renderPasses/GpuPickerRenderPass";
 
 
 let device: GPUDevice;
@@ -18,7 +18,7 @@ let format: GPUTextureFormat;
 let monkeyMesh: Mesh;
 let depthTexture: GPUTexture;
 let projectionMatrix: mat4;
-let pickerRenderPass: GpuPickerRenderPass;
+let gpuPicker: GpuPickerService;
 async function initializeGraphics() {
     const _device = await initWebGPU();
     const _canvas = createCanvas();
@@ -84,10 +84,10 @@ export async function main(){
         mouse.y = ev.y;
         mouse.type = "click";
         mouse.button = ev.button;
-        pickerRenderPass.setPendingPickRequest();
+        gpuPicker.setPendingPickRequest();
     });
 
-    pickerRenderPass = new GpuPickerRenderPass(device, "rgba8unorm", canvas.width, canvas.height);
+    gpuPicker = new GpuPickerService(device, "rgba8unorm", canvas.width, canvas.height);
     function frame(currentTime: number) {
         /////////////handle time: calculate delta time./////////////
         const deltaTime = (currentTime - lastTime) / 1000.0;
@@ -151,29 +151,8 @@ export async function main(){
         device.queue.submit([commandEncoder.finish()]);
 
         // Handle picking if requested and not already in progress
-        if (pickerRenderPass.shouldRunPicking()) {
-            pickerRenderPass.setPickOperationActive();
-            const pickerCommandEncoder = device.createCommandEncoder();
-            pickerCommandEncoder.label = "PickerCommandEncoder";
-            // start the picker render pass
-            const gpuPickerRenderPassEncoder = pickerCommandEncoder.beginRenderPass({
-                label: "gpuPickerRenderPassEncoder",
-                colorAttachments: [{
-                    view: pickerRenderPass.getColorTextureView(),
-                    clearValue: {r:0, g:0, b:0, a:0.0},
-                    loadOp: 'clear',
-                    storeOp:'store',
-                }],
-                depthStencilAttachment: {
-                    view: pickerRenderPass.getDepthTextureView(),
-                    depthClearValue: 1.0,
-                    depthLoadOp: 'clear',
-                    depthStoreOp: 'store'
-                }
-            });
-            gpuPickerRenderPassEncoder.setPipeline(pickerPipeline.getPipeline());
-
-            pickerRenderPass.setViewport(mouse.x, mouse.y, gpuPickerRenderPassEncoder);
+        if (gpuPicker.shouldRunPicking()) {
+            gpuPicker.beginPick(device, pickerPipeline, mouse.x, mouse.y);
             //render the scene to do picking
             transforms.map( (t,i)=>{
                 const dynamicOffset : number= i * pickerPipeline.getDynamicOffsetSize();
@@ -181,21 +160,12 @@ export async function main(){
                 return {offset:dynamicOffset, mesh:mesh};
             }).filter( x => x.mesh != null && x.mesh != undefined)
             .forEach(x=>{
-                gpuPickerRenderPassEncoder.setBindGroup(0, 
-                    pickerPipeline.getBindGroup('main'), [x.offset]);
-                gpuPickerRenderPassEncoder.setVertexBuffer(0, x.mesh.mesh.vertexBuffer);
-                gpuPickerRenderPassEncoder.setIndexBuffer(x.mesh.mesh.indexBuffer, 'uint16');    
-                gpuPickerRenderPassEncoder.drawIndexed(x.mesh.mesh.indexCount);
+                gpuPicker.drawForPicking(x.offset, x.mesh.mesh);
             });
-            // end the picker render pass
-            gpuPickerRenderPassEncoder.end();
-            pickerRenderPass.readTexture(pickerCommandEncoder, mouse.x, mouse.y);
-            device.queue.submit([pickerCommandEncoder.finish()]);
-            // read the result
-
-            pickerRenderPass.readPickedObjectId().then((value:number)=>{
+            gpuPicker.endPick(device);
+            gpuPicker.readPickedObjectId().then((value:number)=>{
                 console.log(`Object id: ${value}`)
-                pickerRenderPass.pickOperationFinished();
+                gpuPicker.pickOperationFinished();
             });
         }        
         // Schedule next frame
@@ -227,6 +197,6 @@ export function changeResolution(w:number, h:number)
         0.1,
         100.0
     );
-    pickerRenderPass.destroy();
-    pickerRenderPass = new GpuPickerRenderPass(device,"rgba8unorm", w, h );
+    gpuPicker.destroy();
+    gpuPicker = new GpuPickerService(device,"rgba8unorm", w, h );
 }
