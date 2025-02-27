@@ -10,6 +10,13 @@ export class GpuPickerRenderPass {
     private stagingBuffer: GPUBuffer;
     private canvasWidth: number;
     private canvasHeight: number;
+
+    public destroy(){
+        this.colorTexture.destroy();
+        this.depthTexture.destroy();
+        this.readBuffer.destroy();
+        this.stagingBuffer.destroy();
+    }
     constructor(device: GPUDevice, format:GPUTextureFormat, canvasWidth:number, canvasHeight:number){
         this.colorTexture = device.createTexture({
             label: "gpuPickerRenderPassColorTexture",

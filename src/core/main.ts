@@ -18,7 +18,7 @@ let format: GPUTextureFormat;
 let monkeyMesh: Mesh;
 let depthTexture: GPUTexture;
 let projectionMatrix: mat4;
-
+let pickerRenderPass: GpuPickerRenderPass;
 async function initializeGraphics() {
     const _device = await initWebGPU();
     const _canvas = createCanvas();
@@ -88,7 +88,7 @@ export async function main(){
     });
     let pickOperationActive = false;
     let pendingPickRequest = false; 
-    const pickerRenderPass = new GpuPickerRenderPass(device, "rgba8unorm", canvas.width, canvas.height);
+    pickerRenderPass = new GpuPickerRenderPass(device, "rgba8unorm", canvas.width, canvas.height);
     function frame(currentTime: number) {
         /////////////handle time: calculate delta time./////////////
         const deltaTime = (currentTime - lastTime) / 1000.0;
@@ -230,4 +230,6 @@ export function changeResolution(w:number, h:number)
         0.1,
         100.0
     );
+    pickerRenderPass.destroy();
+    pickerRenderPass = new GpuPickerRenderPass(device,"rgba8unorm", w, h );
 }
