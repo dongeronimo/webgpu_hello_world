@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
     "@webgpu/types": "^0.1.54",
     "gltf-loader-ts": "^0.3.1",
     "typescript": "~5.7.2",
@@ -16,8 +17,12 @@
   },
   "dependencies": {
     "@types/gl-matrix": "^2.4.5",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
     "@types/three": "^0.173.0",
     "gl-matrix": "^3.4.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "three": "^0.173.0",
     "webgpu-my-first-game": "file:"
   }

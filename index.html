@@ -31,6 +31,7 @@
         </select>
     </div>
     <canvas></canvas>
+    <div id="reactRoot"></div>
     <!-- 
         In Vite, we use the type="module" attribute to enable ES modules.
         The script is processed by Vite's dev server and build process.
@@ -38,6 +39,7 @@
     -->
     <script type="module">
       import {main, changeResolution} from "./src/core/main.ts";
+
       window.addEventListener('load', () => {
           // Since our graphics initialization is async, we need to catch any errors
           main().catch(err => {
