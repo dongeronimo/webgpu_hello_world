@@ -2,14 +2,33 @@
 export class GpuPickerRenderPass {
     private colorTexture: GPUTexture;
     private colorTextureView: GPUTextureView;
-    public ColorTextureView():GPUTextureView { return this.colorTextureView;}
+    public getColorTextureView():GPUTextureView { return this.colorTextureView;}
     private depthTexture: GPUTexture;
     private depthTextureView: GPUTextureView;
-    public DepthTextureView():GPUTextureView { return this.depthTextureView;}
+    public getDepthTextureView():GPUTextureView { return this.depthTextureView;}
     private readBuffer: GPUBuffer;
     private stagingBuffer: GPUBuffer;
     private canvasWidth: number;
     private canvasHeight: number;
+
+    private pickOperationActive = false;
+    private pendingPickRequest = false; 
+
+    public setPendingPickRequest(){
+        this.pendingPickRequest = true;
+    }
+
+    public setPickOperationActive() {
+        this.pendingPickRequest = false;
+        this.pickOperationActive = true; 
+    }
+    public pickOperationFinished() {
+        this.pendingPickRequest = false;
+        this.pickOperationActive = false;
+    }
+    public shouldRunPicking(){
+        return this.pendingPickRequest && !this.pickOperationActive;
+    }
 
     public destroy(){
         this.colorTexture.destroy();

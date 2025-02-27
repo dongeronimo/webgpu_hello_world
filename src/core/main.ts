@@ -84,10 +84,9 @@ export async function main(){
         mouse.y = ev.y;
         mouse.type = "click";
         mouse.button = ev.button;
-        pendingPickRequest = true;
+        pickerRenderPass.setPendingPickRequest();
     });
-    let pickOperationActive = false;
-    let pendingPickRequest = false; 
+
     pickerRenderPass = new GpuPickerRenderPass(device, "rgba8unorm", canvas.width, canvas.height);
     function frame(currentTime: number) {
         /////////////handle time: calculate delta time./////////////
@@ -152,22 +151,21 @@ export async function main(){
         device.queue.submit([commandEncoder.finish()]);
 
         // Handle picking if requested and not already in progress
-        if (pendingPickRequest && !pickOperationActive) {
-            pendingPickRequest = false;
-            pickOperationActive = true;
+        if (pickerRenderPass.shouldRunPicking()) {
+            pickerRenderPass.setPickOperationActive();
             const pickerCommandEncoder = device.createCommandEncoder();
             pickerCommandEncoder.label = "PickerCommandEncoder";
             // start the picker render pass
             const gpuPickerRenderPassEncoder = pickerCommandEncoder.beginRenderPass({
                 label: "gpuPickerRenderPassEncoder",
                 colorAttachments: [{
-                    view: pickerRenderPass.ColorTextureView(),
+                    view: pickerRenderPass.getColorTextureView(),
                     clearValue: {r:0, g:0, b:0, a:0.0},
                     loadOp: 'clear',
                     storeOp:'store',
                 }],
                 depthStencilAttachment: {
-                    view: pickerRenderPass.DepthTextureView(),
+                    view: pickerRenderPass.getDepthTextureView(),
                     depthClearValue: 1.0,
                     depthLoadOp: 'clear',
                     depthStoreOp: 'store'
@@ -197,9 +195,8 @@ export async function main(){
 
             pickerRenderPass.readPickedObjectId().then((value:number)=>{
                 console.log(`Object id: ${value}`)
-                pendingPickRequest = false;
-                pickOperationActive = false;
-            })
+                pickerRenderPass.pickOperationFinished();
+            });
         }        
         // Schedule next frame
         requestAnimationFrame(frame);
