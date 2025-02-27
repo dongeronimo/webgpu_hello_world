@@ -1,3 +1,6 @@
+import { Mesh } from "../mesh";
+import { BasePipeline } from "../pipeline/basePipeline";
+import { PickerPipeline } from "../pipeline/pickerPipeline";
 
 export class GpuPickerRenderPass {
     private colorTexture: GPUTexture;
@@ -122,5 +125,49 @@ export class GpuPickerRenderPass {
         this.readBuffer.unmap();
         
         return objectId;
+    }
+    private gpuPickerRenderPassEncoder:GPURenderPassEncoder|null = null;
+    private pickerPipeline:PickerPipeline|null = null;
+    private pickerCommandEncoder:GPUCommandEncoder|null = null;
+    private x:number = 0;
+    private y:number = 0;
+    public beginPick(device: GPUDevice, pickerPipeline:PickerPipeline, x:number, y:number){
+        this.setPickOperationActive();
+        this.pickerCommandEncoder = device.createCommandEncoder();
+        this.pickerCommandEncoder.label = "PickerCommandEncoder";
+        this.gpuPickerRenderPassEncoder = this.pickerCommandEncoder.beginRenderPass({
+            label: "gpuPickerRenderPassEncoder",
+            colorAttachments: [{
+                view: this.getColorTextureView(),
+                clearValue: {r:0, g:0, b:0, a:0.0},
+                loadOp: 'clear',
+                storeOp:'store',
+            }],
+            depthStencilAttachment: {
+                view: this.getDepthTextureView(),
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store'
+            }
+        });
+        this.pickerPipeline = pickerPipeline;
+        this.gpuPickerRenderPassEncoder.setPipeline(pickerPipeline.getPipeline());
+        this.setViewport(x, y, this.gpuPickerRenderPassEncoder);
+        this.x = x;
+        this.y = y;
+    }
+
+    public drawForPicking(offset:number, mesh:Mesh){
+        this.gpuPickerRenderPassEncoder!.setBindGroup(0, this.pickerPipeline!.getBindGroup('main'), [offset]);
+        this.gpuPickerRenderPassEncoder!.setVertexBuffer(0, mesh.vertexBuffer);
+        this.gpuPickerRenderPassEncoder!.setIndexBuffer(mesh.indexBuffer, 'uint16');    
+        this.gpuPickerRenderPassEncoder!.drawIndexed(mesh.indexCount); 
+    }
+
+    public endPick(device:GPUDevice){
+        this.gpuPickerRenderPassEncoder!.end();
+        this.readTexture(this.pickerCommandEncoder!, this.x, this.y);
+        device.queue.submit([this.pickerCommandEncoder!.finish()]);
+        
     }
 }
