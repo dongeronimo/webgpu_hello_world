@@ -34,8 +34,9 @@ async function initializeGraphics() {
 
 export async function main(){
     //inits canvas, device, context and format
+    let gameObjects = new Array<GameObject>();
     await initializeGraphics();
-    editor = new EditorController();
+    editor = new EditorController(gameObjects);
     await editor.initialize(device);
     monkeyMesh = await createMesh(device, "meshes/monkey.glb");
     const standardPipeline = new StandardPipeline(device, monkeyMesh.vertexBufferLayout, 100);
@@ -53,8 +54,9 @@ export async function main(){
     const up = vec3.fromValues(0, 1, 0);
     mat4.lookAt(viewMatrix, eye, center, up);
     //create the world
-    let gameObjects = new Array<GameObject>();
+
     const root: GameObject = new GameObject("root");
+    editor.setRoot(root);
     new Transform(root);
     // new RotateBehaviour(root);
     gameObjects.push(root);

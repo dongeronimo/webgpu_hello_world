@@ -1,5 +1,5 @@
 import { mat4, vec3 } from "gl-matrix";
-import { Transform } from "../engine/gameObject";
+import { GameObject, Transform } from "../engine/gameObject";
 import { createMesh, Mesh } from "../engine/mesh";
 import { IconPipeline } from "../engine/pipeline/iconPipeline";
 import { loadPNGTexture } from "../io/imageLoad";
@@ -12,9 +12,14 @@ export class EditorController {
     private gameObjectIcon: GPUTexture | null = null;
     private gameObjectIconOn: boolean = true;
     private iconPipeline: IconPipeline | null = null;
-
-    constructor(){
+    private root: GameObject | null = null;
+    private gameObjects: Array<GameObject>;
+    public setRoot(r:GameObject){
+        this.root = r;
+    }
+    constructor(gameObjects:Array<GameObject>){
         EditorController.editorInstance = this;
+        this.gameObjects = gameObjects;
     }
     public setGameObjectIconToggle(x: boolean) {
         this.gameObjectIconOn = x;
@@ -23,6 +28,13 @@ export class EditorController {
         return this.gameObjectIconOn;
     }
 
+    public newGameObject(){
+        const newGO = new GameObject("gameObject");
+        newGO.setParent(this.root!);
+        const t = new Transform(newGO);
+        this.gameObjects.push(newGO);
+    }
+    
     public async initialize(device: GPUDevice) {
         this.iconPlaneMesh = await createMesh(device, "meshes/plane.glb");
         this.gameObjectIcon = await loadPNGTexture(device, 'icons/gameObject.png');
