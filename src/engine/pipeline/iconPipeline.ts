@@ -1,7 +1,8 @@
-import { mat4 } from "gl-matrix";
+import { mat4, vec3 } from "gl-matrix";
 import { loadShader } from "../../io/shaderLoad";
 import { BasePipeline } from "./basePipeline";
 import { Mesh } from "../mesh";
+import { label } from "three/tsl";
 
 export class IconPipeline extends BasePipeline {
     private maxObjects: number;
@@ -38,9 +39,9 @@ export class IconPipeline extends BasePipeline {
             ]
         });
         const sampler = device.createSampler({
-            magFilter: 'linear',
-            minFilter: 'linear',
-            mipmapFilter: 'linear',
+            magFilter: 'nearest',
+            minFilter: 'nearest',
+            mipmapFilter: 'nearest',
             addressModeU: 'repeat',
             addressModeV: 'repeat',
         });
@@ -71,9 +72,11 @@ export class IconPipeline extends BasePipeline {
             GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         );
         // Buffer for view and projection matrices (shared across instances)
+        const vpBufferSize =(2 * 4 * 4 + 4) * Float32Array.BYTES_PER_ELEMENT;  // Two mat4: view and projection, one vec4: cameraPosAndFov
+             
         const vpBuffer = this.createUniformBuffer(
             'vpMatrix',
-            2 * 4 * 4 * Float32Array.BYTES_PER_ELEMENT,  // Two mat4: view and projection
+            vpBufferSize,  // Two mat4: view and projection, one vec4: cameraPosAndFov
             GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
         );
         // Create the bind group layout for textures
@@ -95,7 +98,7 @@ export class IconPipeline extends BasePipeline {
                 buffer: {
                     type: 'uniform',
                     hasDynamicOffset: false,
-                    minBindingSize: 2 * 4 * 4 * Float32Array.BYTES_PER_ELEMENT
+                    minBindingSize: vpBufferSize
                 }
             }
         ]);
@@ -179,11 +182,14 @@ export class IconPipeline extends BasePipeline {
         );
     }
     // Method to update view-projection matrices
-    updateViewProjection(viewMatrix: mat4, projMatrix: mat4): void {
-        const vpData = new Float32Array(32); // Space for two mat4s
+    updateViewProjection(viewMatrix: mat4, projMatrix: mat4, cameraPos:vec3, fov:number): void {
+        const vpData = new Float32Array(32 + 4); // Space for two mat4s and one vec4
         // Make sure we're passing Float32Arrays
         vpData.set(new Float32Array(viewMatrix), 0);
         vpData.set(new Float32Array(projMatrix), 16);
+        vpData.set(new Float32Array(cameraPos), 32);
+        const _temp = [fov];
+        vpData.set(_temp, 35);
         this.updateUniformBuffer('vpMatrix', vpData);
     }
 

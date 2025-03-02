@@ -4,7 +4,7 @@ import { StandardPipeline } from "../engine/pipeline/standardPipeline";
 import { makeDepthTextureForRenderAttachment } from "../engine/textures";
 import { createCanvas, getWebGPUContext, initWebGPU } from "../engine/webgpu";
 import { loadShader } from "../io/shaderLoad";
-import { Deg2Rad } from "./math";
+import { Deg2Rad, getRotationToDirection } from "./math";
 import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameObject";
 import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
 import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
@@ -42,11 +42,11 @@ export async function main(){
     await standardPipeline.initialize();
     const pickerPipeline = new PickerPipeline(device, "rgba8unorm", 100);
     await pickerPipeline.initialize();
-
+    const fov = Deg2Rad(45.0);
     depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
     projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
-    mat4.perspective( projectionMatrix, Deg2Rad(45.0),canvas.width / canvas.height,0.1,100.0);
+    mat4.perspective( projectionMatrix, fov,canvas.width / canvas.height,0.1,100.0);
     // Set up camera position and orientation
     const eye = vec3.fromValues(15, 0, 15);
     const center = vec3.fromValues(0, 0, 0);
@@ -56,7 +56,7 @@ export async function main(){
     let gameObjects = new Array<GameObject>();
     const root: GameObject = new GameObject("root");
     new Transform(root);
-    //new RotateBehaviour(root);
+    // new RotateBehaviour(root);
     gameObjects.push(root);
     for(let i=0;i<10; i++){
         const newGameObject = new GameObject(`monkey ${i}`);
@@ -108,7 +108,7 @@ export async function main(){
         //update view and projection uniforms in the gpu
         standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
         pickerPipeline.updateViewProjection(viewMatrix, projectionMatrix);
-        editor.updateViewProjection(viewMatrix, projectionMatrix);
+        editor.updateViewProjection(viewMatrix, projectionMatrix, eye, fov);
         //update all model uniforms in the gpu
         const transforms = gameObjects.map( (go)=>{
             const transform = go.getComponent(Transform.name)! as Transform;
@@ -118,7 +118,9 @@ export async function main(){
             const worldTransform = t.getWorldTransform();
             standardPipeline.updateModelMatrix(i, worldTransform);
             pickerPipeline.updateObjectSpecificUniformBuffer(i, worldTransform, t.owner.id);
-            editor.updateModelMatrix(i, worldTransform);
+            //the icons use only the world position
+            const iconTransform = editor.calculateIconModelMatrix(worldTransform, eye);
+            editor.updateIconModelMatrix(i,iconTransform);
         });
         /////////////Begin encoding commands//////////////
         const commandEncoder = device.createCommandEncoder();
@@ -171,6 +173,14 @@ export async function main(){
             .forEach(x=>{
                 gpuPicker.drawForPicking(x.offset, x.mesh.mesh);
             });
+            if(editor.getGameObjectIconToggle() == true){
+                transforms.map((t,i)=>{
+                    const dynamicOffset = i * pickerPipeline.getDynamicOffsetSize();
+                    return dynamicOffset;
+                }).forEach(x => {
+                    gpuPicker.drawForPicking(x, editor.getIconPlaneMesh());
+                });
+            }
             gpuPicker.endPick(device);
             gpuPicker.readPickedObjectId().then((value:number)=>{
                 console.log(`Object id: ${value}`)

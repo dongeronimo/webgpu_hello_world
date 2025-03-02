@@ -1,9 +1,10 @@
 import React from 'react'
+import SceneIconToggle from './SceneIconToggle'
 
 function Editor() {
   return (
     <div>
-      <h1>Hello from React!</h1>
+      <SceneIconToggle/>
     </div>
   )
 }

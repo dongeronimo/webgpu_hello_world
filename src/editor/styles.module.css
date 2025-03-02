@@ -1,0 +1,9 @@
+.iconsTogglePanel {
+    display: flex;
+    flex-direction: column;
+    background: red;
+}
+.iconsToggleList {
+    display: flex;
+    flex-direction: row;
+}

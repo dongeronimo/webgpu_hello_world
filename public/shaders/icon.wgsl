@@ -5,6 +5,7 @@ struct Uniforms {
 struct VPUniforms {
     viewMatrix: mat4x4<f32>,
     projectionMatrix: mat4x4<f32>,
+    cameraPosAndFov: vec4<f32>,
 };
 
 // First bind group for matrices
@@ -28,14 +29,22 @@ struct VertexOutput {
     @location(2) worldPos: vec3<f32>,
 };
 
+// fn tan(x:f32)->f32 {
+//     return sin(x) / cos(x);
+// }
 @vertex
 fn vertexMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     
     // Transform the vertex position from model to world space
     let worldPos = uniforms.modelMatrix * vec4<f32>(in.position, 1.0);
+    let distance = length(worldPos.xyz - vpUniforms.cameraPosAndFov.xyz);
+    // Apply distance-based scaling to counteract perspective
+    
+    let scaleFactor = distance * tan(vpUniforms.cameraPosAndFov.a * 0.5) * 2.0;
+    let scaledPos = in.position * scaleFactor / 25.0;
     // Transform from world to view to clip space
-    out.position = vpUniforms.projectionMatrix * vpUniforms.viewMatrix * worldPos;
+    out.position = vpUniforms.projectionMatrix * vpUniforms.viewMatrix * uniforms.modelMatrix * vec4<f32>(scaledPos, 1.0);
     
     // Transform normal to world space (ignoring translation)
     out.normal = normalize((uniforms.modelMatrix * vec4<f32>(in.normal, 0.0)).xyz);
