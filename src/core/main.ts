@@ -4,12 +4,13 @@ import { StandardPipeline } from "../engine/pipeline/standardPipeline";
 import { makeDepthTextureForRenderAttachment } from "../engine/textures";
 import { createCanvas, getWebGPUContext, initWebGPU } from "../engine/webgpu";
 import { loadShader } from "../io/shaderLoad";
-import { Deg2Rad } from "./math";
+import { Deg2Rad, getRotationToDirection } from "./math";
 import { Behaviour, GameObject, MeshComponent, Transform } from "../engine/gameObject";
 import { RotateBehaviour } from "../engine/behaviours/RotateBehaviour";
 import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
 import { GpuPickerService } from "../engine/renderPasses/GpuPickerRenderPass";
 import "../editor/reactInit";
+import { EditorController } from "../editor/EditorController";
 
 let device: GPUDevice;
 let canvas: HTMLCanvasElement;
@@ -19,6 +20,8 @@ let monkeyMesh: Mesh;
 let depthTexture: GPUTexture;
 let projectionMatrix: mat4;
 let gpuPicker: GpuPickerService;
+let editor: EditorController;
+
 async function initializeGraphics() {
     const _device = await initWebGPU();
     const _canvas = createCanvas();
@@ -32,16 +35,18 @@ async function initializeGraphics() {
 export async function main(){
     //inits canvas, device, context and format
     await initializeGraphics();
+    editor = new EditorController();
+    await editor.initialize(device);
     monkeyMesh = await createMesh(device, "meshes/monkey.glb");
     const standardPipeline = new StandardPipeline(device, monkeyMesh.vertexBufferLayout, 100);
     await standardPipeline.initialize();
     const pickerPipeline = new PickerPipeline(device, "rgba8unorm", 100);
     await pickerPipeline.initialize();
-
+    const fov = Deg2Rad(45.0);
     depthTexture = makeDepthTextureForRenderAttachment(device, canvas.width, canvas.height);
     projectionMatrix = mat4.create();
     const viewMatrix = mat4.create();
-    mat4.perspective( projectionMatrix, Deg2Rad(45.0),canvas.width / canvas.height,0.1,100.0);
+    mat4.perspective( projectionMatrix, fov,canvas.width / canvas.height,0.1,100.0);
     // Set up camera position and orientation
     const eye = vec3.fromValues(15, 0, 15);
     const center = vec3.fromValues(0, 0, 0);
@@ -51,7 +56,7 @@ export async function main(){
     let gameObjects = new Array<GameObject>();
     const root: GameObject = new GameObject("root");
     new Transform(root);
-    //new RotateBehaviour(root);
+    // new RotateBehaviour(root);
     gameObjects.push(root);
     for(let i=0;i<10; i++){
         const newGameObject = new GameObject(`monkey ${i}`);
@@ -59,7 +64,7 @@ export async function main(){
         const transform = new Transform(newGameObject);
         const x = i % 5;
         const y = i / 5;
-        const pos:vec3 = [x*3-5, y*3-5, 0];
+        const pos:vec3 = [x*3-5, y*3+2, 0];
         transform.setPosition(pos);
         transform.rotationFromAngleAxis(Deg2Rad(45.0), [1.0, 0,0]);
         if(i%2==0){
@@ -103,6 +108,7 @@ export async function main(){
         //update view and projection uniforms in the gpu
         standardPipeline.updateViewProjection(viewMatrix, projectionMatrix);
         pickerPipeline.updateViewProjection(viewMatrix, projectionMatrix);
+        editor.updateViewProjection(viewMatrix, projectionMatrix, eye, fov);
         //update all model uniforms in the gpu
         const transforms = gameObjects.map( (go)=>{
             const transform = go.getComponent(Transform.name)! as Transform;
@@ -112,12 +118,16 @@ export async function main(){
             const worldTransform = t.getWorldTransform();
             standardPipeline.updateModelMatrix(i, worldTransform);
             pickerPipeline.updateObjectSpecificUniformBuffer(i, worldTransform, t.owner.id);
+            //the icons use only the world position
+            const iconTransform = editor.calculateIconModelMatrix(worldTransform, eye);
+            editor.updateIconModelMatrix(i,iconTransform);
         });
         /////////////Begin encoding commands//////////////
         const commandEncoder = device.createCommandEncoder();
         commandEncoder.label ="mainCommandEncoder";
         // Get the current texture view from the context
         const textureView = ctx.getCurrentTexture().createView();
+        const depthView = depthTexture.createView();
         // Start the main render passs
         const mainRenderPassEncoder = commandEncoder.beginRenderPass({
             colorAttachments: [{
@@ -127,7 +137,7 @@ export async function main(){
                 storeOp: 'store'
             }],
             depthStencilAttachment: {
-                view: depthTexture.createView(),
+                view: depthView,
                 depthClearValue: 1.0,
                 depthLoadOp: 'clear',
                 depthStoreOp: 'store'
@@ -148,6 +158,7 @@ export async function main(){
             mainRenderPassEncoder.drawIndexed(x.mesh.mesh.indexCount);
         });
         mainRenderPassEncoder.end();///end the main render pass
+        editor.iconsRenderPass(commandEncoder, textureView, depthView, transforms);
         device.queue.submit([commandEncoder.finish()]);
 
         // Handle picking if requested and not already in progress
@@ -162,6 +173,14 @@ export async function main(){
             .forEach(x=>{
                 gpuPicker.drawForPicking(x.offset, x.mesh.mesh);
             });
+            if(editor.getGameObjectIconToggle() == true){
+                transforms.map((t,i)=>{
+                    const dynamicOffset = i * pickerPipeline.getDynamicOffsetSize();
+                    return dynamicOffset;
+                }).forEach(x => {
+                    gpuPicker.drawForPicking(x, editor.getIconPlaneMesh());
+                });
+            }
             gpuPicker.endPick(device);
             gpuPicker.readPickedObjectId().then((value:number)=>{
                 console.log(`Object id: ${value}`)
