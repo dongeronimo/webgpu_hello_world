@@ -2,25 +2,18 @@
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import styles from "./styles.module.css";
 import { EditorController } from './EditorController';
+import { useAppDispatch, useAppSelector } from './redux/hooks';
+import { AppState } from './redux/types';
+import { toggleGameObjectIcon } from './redux/actions';
 function SceneIconToggle() {
-  const [checkedItems, setCheckedItems] = useState({
-    gameObjectIcon: true,
-  });
+  const showGameObjectIcon = useAppSelector((state:AppState)=>state.showGameObjectIcon);
+  const dispatch = useAppDispatch();
   
-  const handleChange = (event:ChangeEvent<HTMLInputElement>) => {
-    setCheckedItems({
-      ...checkedItems,
-      [event.target.name]: event.target.checked
-    });
-
+  const gameObjectIconChange = (event:ChangeEvent<HTMLInputElement>) => {
+    const value = Boolean(event.target.checked);
+    dispatch(toggleGameObjectIcon(value));
   };
-  useEffect(() => {
-    if(checkedItems.gameObjectIcon == true){
-        EditorController.editorInstance?.setGameObjectIconToggle(true);
-    }else {
-        EditorController.editorInstance?.setGameObjectIconToggle(false);
-    }
-  }, [checkedItems.gameObjectIcon]);
+
   return (
     <div className={styles.iconsTogglePanel}>
       <span>icons:</span>  
@@ -29,8 +22,8 @@ function SceneIconToggle() {
           <input 
             type="checkbox" 
             name="gameObjectIcon" 
-            checked={checkedItems.gameObjectIcon} 
-            onChange={handleChange} 
+            checked={showGameObjectIcon} 
+            onChange={gameObjectIconChange} 
           />
           GameObject
         </label>

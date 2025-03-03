@@ -4,5 +4,6 @@ export enum Resolution {
 };
 
 export interface AppState {
-    resolution: Resolution
+    resolution: Resolution;
+    showGameObjectIcon: boolean;
 }
