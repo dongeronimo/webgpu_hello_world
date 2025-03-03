@@ -1,9 +1,10 @@
-import { AppActionTypes, SET_RESOLUTION, TOGGLE_GAME_OBJECT_ICON } from "./actions";
+import { AppActionTypes, SET_CURRENT_GAME_OBJECT, SET_RESOLUTION, TOGGLE_GAME_OBJECT_ICON } from "./actions";
 import { AppState, Resolution } from "./types";
 
 const intitialState: AppState = {
     resolution: Resolution._1024x768,
     showGameObjectIcon: true,
+    selectedGameObject: 0,
 }
 
 const appReducer = (state = intitialState, action:AppActionTypes):AppState =>
@@ -20,6 +21,12 @@ const appReducer = (state = intitialState, action:AppActionTypes):AppState =>
             newState = {
                 ...state,
                 showGameObjectIcon: action.payload
+            }
+            break;
+        case SET_CURRENT_GAME_OBJECT:
+            newState = {
+                ...state,
+                selectedGameObject : action.payload
             }
             break;
         default:

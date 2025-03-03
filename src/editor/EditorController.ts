@@ -6,6 +6,8 @@ import { loadPNGTexture } from "../io/imageLoad";
 import { getRotationToDirection } from "../core/math";
 import { AppState } from "./redux/types";
 import { store } from "./redux/store";
+import { setCurrentGameObject } from "./redux/actions";
+import { GameManager } from "../core/gameManager";
 
 export class EditorController {
     public static editorInstance:EditorController|undefined = undefined;
@@ -15,13 +17,13 @@ export class EditorController {
     private gameObjectIconOn: boolean = true;
     private iconPipeline: IconPipeline | null = null;
     private root: GameObject | null = null;
-    private gameObjects: Array<GameObject>;
+    // private gameObjects: Array<GameObject>;
     private selectedGameObject: GameObject|undefined = undefined;
     private state:AppState;
     public setRoot(r:GameObject){
         this.root = r;
     }
-    constructor(gameObjects:Array<GameObject>){
+    constructor(){
         this.state = store.getState();
         store.subscribe(()=>{
             const newState = store.getState();
@@ -33,7 +35,7 @@ export class EditorController {
             this.state = newState;
         })
         EditorController.editorInstance = this;
-        this.gameObjects = gameObjects;
+        // this.gameObjects = gameObjects;
     }
     public setGameObjectIconToggle(x: boolean) {
         this.gameObjectIconOn = x;
@@ -46,7 +48,7 @@ export class EditorController {
         const newGO = new GameObject("gameObject");
         newGO.setParent(this.root!);
         const t = new Transform(newGO);
-        this.gameObjects.push(newGO);
+        GameManager.getInstance().getGameObjects().push(newGO);
     }
     
     public async initialize(device: GPUDevice) {
@@ -101,6 +103,12 @@ export class EditorController {
 
     public setSelectedGameObject(go:GameObject|undefined){
         this.selectedGameObject = go;
+        if(go!=undefined){
+            store.dispatch(setCurrentGameObject(go.id));
+        }
+        else {
+            store.dispatch(setCurrentGameObject(0));
+        }
     }
     public getSelectedGameObject():GameObject|undefined {
         return this.selectedGameObject;

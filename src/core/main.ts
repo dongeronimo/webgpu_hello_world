@@ -13,6 +13,7 @@ import "../editor/reactInit";
 import { EditorController } from "../editor/EditorController";
 import { store } from "../editor/redux/store";
 import { Resolution } from "../editor/redux/types";
+import { GameManager } from "./gameManager";
 
 let device: GPUDevice;
 let canvas: HTMLCanvasElement;
@@ -23,6 +24,7 @@ let depthTexture: GPUTexture;
 let projectionMatrix: mat4;
 let gpuPicker: GpuPickerService;
 let editor: EditorController;
+
 
 async function initializeGraphics() {
     const _device = await initWebGPU();
@@ -51,9 +53,9 @@ export async function main(){
         state = newState;
     })
     //inits canvas, device, context and format
-    let gameObjects = new Array<GameObject>();
+    
     await initializeGraphics();
-    editor = new EditorController(gameObjects);
+    editor = new EditorController();
     await editor.initialize(device);
     monkeyMesh = await createMesh(device, "meshes/monkey.glb");
     const standardPipeline = new StandardPipeline(device, monkeyMesh.vertexBufferLayout, 100);
@@ -76,7 +78,7 @@ export async function main(){
     editor.setRoot(root);
     new Transform(root);
     // new RotateBehaviour(root);
-    gameObjects.push(root);
+    GameManager.getInstance().getGameObjects().push(root);
     for(let i=0;i<10; i++){
         const newGameObject = new GameObject(`monkey ${i}`);
         newGameObject.setParent(root);
@@ -90,7 +92,7 @@ export async function main(){
             new RotateBehaviour(newGameObject);
         }
         new MeshComponent(newGameObject, monkeyMesh);
-        gameObjects.push(newGameObject);
+        GameManager.getInstance().getGameObjects().push(newGameObject);
     }
     let lastTime = 0;
     const behavioursTable = new Array<string>();
@@ -117,7 +119,7 @@ export async function main(){
         const deltaTime = (currentTime - lastTime) / 1000.0;
         lastTime = currentTime;
         /////////////start behaviours that hasn't been started yet///////////
-        const behaviours = gameObjects.map((go)=>behavioursTable.map(b=>go.getComponent(b)! as Behaviour))
+        const behaviours = GameManager.getInstance().getGameObjects().map((go)=>behavioursTable.map(b=>go.getComponent(b)! as Behaviour))
             .flatMap(bLst=> bLst.map(b=>b))
             .filter(go=>go!=null || go!=undefined);
         behaviours.filter(b=>!b.IsStarted()).forEach(b=>b.start());    
@@ -129,7 +131,7 @@ export async function main(){
         pickerPipeline.updateViewProjection(viewMatrix, projectionMatrix);
         editor.updateViewProjection(viewMatrix, projectionMatrix, eye, fov);
         //update all model uniforms in the gpu
-        const transforms = gameObjects.map( (go)=>{
+        const transforms = GameManager.getInstance().getGameObjects().map( (go)=>{
             const transform = go.getComponent(Transform.name)! as Transform;
             return transform;
         });
@@ -203,7 +205,7 @@ export async function main(){
             gpuPicker.endPick(device);
             gpuPicker.readPickedObjectId().then((value:number)=>{
                 console.log(`Object id: ${value}`)
-                const selectedGO = gameObjects.find(go=>go.id == value);
+                const selectedGO = GameManager.getInstance().getGameObjects().find(go=>go.id == value);
                 EditorController.editorInstance?.setSelectedGameObject(selectedGO);
                 gpuPicker.pickOperationFinished();
             });
