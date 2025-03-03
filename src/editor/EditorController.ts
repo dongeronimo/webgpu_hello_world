@@ -14,6 +14,7 @@ export class EditorController {
     private iconPipeline: IconPipeline | null = null;
     private root: GameObject | null = null;
     private gameObjects: Array<GameObject>;
+    private selectedGameObject: GameObject|undefined = undefined;
     public setRoot(r:GameObject){
         this.root = r;
     }
@@ -83,6 +84,13 @@ export class EditorController {
             m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 0;
             return m;
         }
+    }
+
+    public setSelectedGameObject(go:GameObject|undefined){
+        this.selectedGameObject = go;
+    }
+    public getSelectedGameObject():GameObject|undefined {
+        return this.selectedGameObject;
     }
     public iconsRenderPass(commandEncoder: GPUCommandEncoder, targetColor: GPUTextureView,
         targetDepth: GPUTextureView, transforms: Transform[]

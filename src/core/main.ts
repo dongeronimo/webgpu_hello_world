@@ -11,6 +11,8 @@ import { PickerPipeline } from "../engine/pipeline/pickerPipeline";
 import { GpuPickerService } from "../engine/renderPasses/GpuPickerRenderPass";
 import "../editor/reactInit";
 import { EditorController } from "../editor/EditorController";
+import { store } from "../editor/redux/store";
+import { Resolution } from "../editor/redux/types";
 
 let device: GPUDevice;
 let canvas: HTMLCanvasElement;
@@ -33,6 +35,21 @@ async function initializeGraphics() {
 }
 
 export async function main(){
+    let state = store.getState();
+    store.subscribe(()=>{
+        const newState = store.getState();
+        if(state.resolution !== newState.resolution) {
+            switch(newState.resolution){
+                case Resolution._800x600:
+                    changeResolution(800, 600);
+                    break;
+                case Resolution._1024x768:
+                    changeResolution(1024, 768);
+                    break;
+            }
+        }
+        state = newState;
+    })
     //inits canvas, device, context and format
     let gameObjects = new Array<GameObject>();
     await initializeGraphics();
@@ -186,6 +203,8 @@ export async function main(){
             gpuPicker.endPick(device);
             gpuPicker.readPickedObjectId().then((value:number)=>{
                 console.log(`Object id: ${value}`)
+                const selectedGO = gameObjects.find(go=>go.id == value);
+                EditorController.editorInstance?.setSelectedGameObject(selectedGO);
                 gpuPicker.pickOperationFinished();
             });
         }        

@@ -16,20 +16,14 @@
             background-color: #00ff9d;
         }
 
-        canvas {6
-            width: 800px;
-            height: 600px;
+        canvas {
+            width: 1024px;
+            height: 768px;
             border: 1px solid #333;
         }
     </style>
 </head>
 <body>
-    <div>
-        <select id="selectChangeResolution" onchange="">
-            <option value="800x600">800x600</option>
-            <option value="1024x768">1024x768</option>
-        </select>
-    </div>
     <canvas></canvas>
     <div id="reactRoot"></div>
     <!-- 
@@ -49,20 +43,20 @@
               document.body.innerHTML = `<pre style="color: red">${err}</pre>`;
           });
       });
-      const selectChangeResolution = document.getElementById('selectChangeResolution');
-      selectChangeResolution.addEventListener('change', (event)=>{
-        const selectedValue = event.target.value;
-        switch(selectedValue) {
-            case "800x600":
-                changeResolution(800, 600);
-                break;
-            case "1024x768":
-                changeResolution(1024, 762);
-                break;
-            default:
-                alert("selectChangeResolution crazy value");
-        }
-      })
+    //   const selectChangeResolution = document.getElementById('selectChangeResolution');
+    //   selectChangeResolution.addEventListener('change', (event)=>{
+    //     const selectedValue = event.target.value;
+    //     switch(selectedValue) {
+    //         case "800x600":
+    //             changeResolution(800, 600);
+    //             break;
+    //         case "1024x768":
+    //             changeResolution(1024, 762);
+    //             break;
+    //         default:
+    //             alert("selectChangeResolution crazy value");
+    //     }
+    //   })
     </script>
 </body>
 </html>
