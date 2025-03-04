@@ -1,7 +1,10 @@
-
-function TitleBar(props: { title: string }) {
+import styles from "./styles.module.css";
+function TitleBar(props: { 
+    title: string ,
+    
+}) {
     return (
-        <div><span>{props.title}</span></div>
+        <div className={styles.titleBar}><span>{props.title}</span></div>
     )
 } 
 

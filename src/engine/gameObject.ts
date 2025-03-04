@@ -5,7 +5,7 @@ let counter:number = 0;
 
 export class GameObject {
     public readonly id:number;
-    public readonly name:string;
+    public name:string;
     private components:Map<string, Component>= new Map();
     private children:Array<GameObject> = new Array();
     private parent:GameObject|null = null;
