@@ -1,5 +1,5 @@
 import React, { useState, useEffect, KeyboardEvent, FocusEvent } from 'react';
-
+import styles from "./styles.module.css";
 interface NumericInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -64,7 +64,7 @@ function NumericInput({
   
   return (
     <input
-      
+      className={styles.numericInput}
       type="number"
       value={localValue}
       onChange={handleChange}

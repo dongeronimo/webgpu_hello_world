@@ -27,3 +27,9 @@
     border-color: darkturquoise;
     min-height: 256px;  
 }
+
+.numericInput {
+    max-width:64px;
+    min-width: 64px;
+    font-size: smaller;
+}
