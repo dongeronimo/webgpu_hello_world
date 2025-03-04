@@ -133,10 +133,13 @@ export class EditorController {
             });
             renderPassEncoder.setPipeline(this.iconPipeline!.getPipeline());
             //draw transforms
-            transforms.map((t, i) => {
+            transforms
+            .map((t, i) => {
                 const dynamicOffset: number = i * this.iconPipeline!.getDynamicOffsetSize();
-                return { offset: dynamicOffset, icon: 'icons/gameObject.png' };
-            }).forEach(x => {
+                return { offset: dynamicOffset, icon: 'icons/gameObject.png', goid:t.owner.id };
+            })
+            .filter((x)=>x.goid !==1)
+            .forEach(x => {
                 this.iconPipeline?.draw(renderPassEncoder, x.offset, x.icon);
             });
             //end the pass

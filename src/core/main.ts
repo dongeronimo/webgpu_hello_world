@@ -195,9 +195,11 @@ export async function main(){
                 gpuPicker.drawForPicking(x.offset, x.mesh.mesh);
             });
             if(editor.getGameObjectIconToggle() == true){
-                transforms.map((t,i)=>{
-                    const dynamicOffset = i * pickerPipeline.getDynamicOffsetSize();
-                    return dynamicOffset;
+                transforms
+                    .filter(t=>t.owner.id!==1)
+                    .map((t,i)=>{
+                        const dynamicOffset = i * pickerPipeline.getDynamicOffsetSize();
+                        return dynamicOffset;
                 }).forEach(x => {
                     gpuPicker.drawForPicking(x, editor.getIconPlaneMesh());
                 });

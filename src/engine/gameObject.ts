@@ -1,5 +1,6 @@
 import { mat4, quat, vec3 } from "gl-matrix";
 import { Mesh } from "./mesh";
+import { degToRad, radToDeg } from "three/src/math/MathUtils.js";
 
 let counter:number = 0;
 
@@ -70,7 +71,17 @@ export class Transform extends Component {
         super(owner);
         this.calculateLocalTransform();
     }
+    public getPosition():vec3 {return this.pos;}
+    public getScale():vec3 {return this.scale;}
+    public getAxisAngle() : {axis:vec3, angle:number}{
+        let axis = vec3.create();
+        let angle = radToDeg(quat.getAxisAngle(axis, this.rotation));
+        return {
+            axis: axis, angle: angle
+        }
+    }
     private calculateLocalTransform():mat4 {
+        
         // Reset to identity
         mat4.identity(this.localTransform);
         

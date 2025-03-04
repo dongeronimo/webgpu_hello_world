@@ -5,6 +5,8 @@ import TitleBar from './TitleBar';
 import { GameManager } from '../core/gameManager';
 import styles from "./styles.module.css";
 import GameObjectEditor from './GameObjectEditor';
+import TransformEditor from './TransformEditor';
+import { Transform } from '../engine/gameObject';
 
 function GameObjectEditorPanel () {
     const selectedGameObjectId = useAppSelector( (state:AppState)=>state.selectedGameObject);
@@ -66,7 +68,11 @@ function GameObjectEditorPanel () {
     }, [selectedGameObjectId]);
 
     const selectedGameObject = GameManager.getInstance().getGameObjects().find((v)=>v.id === selectedGameObjectId);
-
+    
+    const transformEditor = selectedGameObject?.getComponent(Transform.name)!=undefined ? 
+      <TransformEditor transform={selectedGameObject!.getComponent(Transform.name) as Transform}/>:
+      <div></div>;
+    
     if(selectedGameObjectId!=0){
         return (
           <div
@@ -86,7 +92,8 @@ function GameObjectEditorPanel () {
           >
             <div className={styles.componentPanelList}>
               <TitleBar title={selectedGameObject!.name}/>
-              <GameObjectEditor go={selectedGameObject} />
+              <GameObjectEditor go={selectedGameObject!} />
+              {transformEditor}
             </div>
           </div>
         );
