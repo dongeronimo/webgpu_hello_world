@@ -64,6 +64,7 @@ function NumericInput({
   
   return (
     <input
+      
       type="number"
       value={localValue}
       onChange={handleChange}

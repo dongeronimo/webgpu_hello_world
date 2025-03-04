@@ -17,17 +17,34 @@ function TransformEditor(props:{transform:Transform}) {
         const v = Number(e);
         props.transform.setPosition([position[0], position[1], v]);
     }
+    const onSXChange = (e:string)=>{
+        const v = Number(e);
+        props.transform.setScale([v, scale[1], scale[2]]);
+    }
+    const onSYChange = (e:string)=>{
+        const v = Number(e);
+        props.transform.setScale([scale[0], v, scale[2]]);
+    }
+    const onSZChange = (e:string)=>{
+        const v = Number(e);
+        props.transform.setScale([scale[0], scale[1], v]);
+    }
     return (
         <div>
             <div><span>Local Transform</span></div>
             <div><span>Position</span></div>
             <div>
-                <NumericInput value={position[0]+""} onChange={onPXChange}/>
-                <NumericInput value={position[1]+""} onChange={onPYChange}/>
-                <NumericInput value={position[2]+""} onChange={onPZChange}/>
+                <NumericInput value={position[0]+""} onChange={onPXChange} step={0.25}/>
+                <NumericInput value={position[1]+""} onChange={onPYChange} step={0.25}/>
+                <NumericInput value={position[2]+""} onChange={onPZChange} step={0.25}/>
             </div>
             <div><span>Rotation</span></div>
             <div><span>Scale</span></div>
+            <div>
+                <NumericInput value={scale[0]+""} onChange={onSXChange} step={0.25}/>
+                <NumericInput value={scale[1]+""} onChange={onSYChange} step={0.25}/>
+                <NumericInput value={scale[2]+""} onChange={onSZChange} step={0.25}/>
+            </div>
         </div>
     )
 }

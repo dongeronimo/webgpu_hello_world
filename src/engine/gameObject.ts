@@ -108,6 +108,12 @@ export class Transform extends Component {
         this.pos[2] = p[2];
         this.calculateLocalTransform();
     }   
+    public setScale(s:vec3){
+        this.scale[0] = s[0]
+        this.scale[1] = s[1]
+        this.scale[2] = s[2]
+        this.calculateLocalTransform();
+    }
     
     public getWorldTransform():mat4{
         const worldTransform = mat4.create();
