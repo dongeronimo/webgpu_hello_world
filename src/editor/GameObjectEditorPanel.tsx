@@ -6,7 +6,8 @@ import { GameManager } from '../core/gameManager';
 import styles from "./styles.module.css";
 import GameObjectEditor from './GameObjectEditor';
 import TransformEditor from './TransformEditor';
-import { Transform } from '../engine/gameObject';
+import { MeshComponent, Transform } from '../engine/gameObject';
+import MeshEditor from './MeshEditor';
 
 function GameObjectEditorPanel () {
     const selectedGameObjectId = useAppSelector( (state:AppState)=>state.selectedGameObject);
@@ -73,6 +74,9 @@ function GameObjectEditorPanel () {
       <TransformEditor transform={selectedGameObject!.getComponent(Transform.name) as Transform}/>:
       <div></div>;
     
+    const meshEditor = selectedGameObject?.getComponent(MeshComponent.name)!=undefined ?
+       <MeshEditor/>:
+       <div></div>
     if(selectedGameObjectId!=0){
         return (
           <div
@@ -94,6 +98,7 @@ function GameObjectEditorPanel () {
               <TitleBar title={selectedGameObject!.name}/>
               <GameObjectEditor go={selectedGameObject!} />
               {transformEditor}
+              {meshEditor}
             </div>
           </div>
         );

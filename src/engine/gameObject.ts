@@ -62,6 +62,8 @@ export class Behaviour extends Component {
 }
 
 export class Transform extends Component {
+    public static defaultAngle = 90.0;
+    public static defaultAxis:vec3 = [1,0,0];
     private pos: vec3 = vec3.create();
     private scale: vec3 = [1.0, 1.0, 1.0];
     private rotation: quat = quat.create();
@@ -69,7 +71,7 @@ export class Transform extends Component {
     public getLocalTransform(): mat4 { return this.localTransform; }
     constructor(owner: GameObject) {
         super(owner);
-        this.calculateLocalTransform();
+        this.calculateLocalTransform();   
     }
     public getPosition(): vec3 { return this.pos; }
     public getScale(): vec3 { return this.scale; }
@@ -98,9 +100,9 @@ export class Transform extends Component {
 
         return this.localTransform;
     }
-    public rotationFromAngleAxis(angleInRad: number, axis: vec3) {
+    public rotationFromAngleAxis(angle: number, axis: vec3) {
         vec3.normalize(axis, axis);
-        quat.setAxisAngle(this.rotation, axis, angleInRad);
+        quat.setAxisAngle(this.rotation, axis, angle);
         this.calculateLocalTransform();
     }
     public setPosition(p: vec3) {

@@ -87,7 +87,7 @@ export async function main(){
         const y = i / 5;
         const pos:vec3 = [x*3-5, y*3+2, 0];
         transform.setPosition(pos);
-        transform.rotationFromAngleAxis(Deg2Rad(45.0), [1.0, 0,0]);
+        transform.rotationFromAngleAxis(Deg2Rad(Transform.defaultAngle), Transform.defaultAxis);
         if(i%2==0){
             new RotateBehaviour(newGameObject);
         }
@@ -196,12 +196,13 @@ export async function main(){
             });
             if(editor.getGameObjectIconToggle() == true){
                 transforms
-                    .filter(t=>t.owner.id!==1)
                     .map((t,i)=>{
                         const dynamicOffset = i * pickerPipeline.getDynamicOffsetSize();
-                        return dynamicOffset;
-                }).forEach(x => {
-                    gpuPicker.drawForPicking(x, editor.getIconPlaneMesh());
+                        return {offset:dynamicOffset, goId:t.owner.id};
+                })
+                .filter((x)=>x.goId!==1)
+                .forEach(x => {
+                    gpuPicker.drawForPicking(x.offset, editor.getIconPlaneMesh());
                 });
             }
             gpuPicker.endPick(device);

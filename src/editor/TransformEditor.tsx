@@ -7,6 +7,7 @@ function TransformEditor(props:{transform:Transform}) {
     const scale = props.transform.getScale();
     const axisAngle = props.transform.getAxisAngle();
     const euler = props.transform.getEuler();
+    console.log("axis/angle:", axisAngle.axis, axisAngle.angle);
     const onPXChange = (e: string) =>{
         const v = Number(e);
         props.transform.setPosition([v, position[1], position[2]]);
@@ -48,7 +49,7 @@ function TransformEditor(props:{transform:Transform}) {
     }
     const onAngleChange = (e:string) => {
         const v = Number(e);
-        props.transform.rotationFromAngleAxis(v, 
+        props.transform.rotationFromAngleAxis(degToRad(v), 
             [axisAngle.axis[0], axisAngle.axis[1], axisAngle.axis[2]]);
     }
     const onEXChange = (e:string)=>{
@@ -63,32 +64,33 @@ function TransformEditor(props:{transform:Transform}) {
         const v = Number(e);
         props.transform.fromEuler([euler[0], euler[1], v])
     }
+    
     return (
         <div>
             <div><span>Local Transform</span></div>
             <div><span>Position</span></div>
             <div>
-                <NumericInput value={position[0]+""} onChange={onPXChange} step={0.25}/>
-                <NumericInput value={position[1]+""} onChange={onPYChange} step={0.25}/>
-                <NumericInput value={position[2]+""} onChange={onPZChange} step={0.25}/>
+                <NumericInput value={position[0].toPrecision(3)} onChange={onPXChange} step={0.25}/>
+                <NumericInput value={position[1].toPrecision(3)} onChange={onPYChange} step={0.25}/>
+                <NumericInput value={position[2].toPrecision(3)} onChange={onPZChange} step={0.25}/>
             </div>
             <div><span>Rotation</span></div>
             <div>
                 <span>Axis:</span>
-                <NumericInput value={axisAngle.axis[0]+""} onChange={onAXChange} step={0.01}/>
-                <NumericInput value={axisAngle.axis[1]+""} onChange={onAYChange} step={0.01}/>
-                <NumericInput value={axisAngle.axis[2]+""} onChange={onAZChange} step={0.01}/>
+                <NumericInput value={axisAngle.axis[0].toPrecision(3)} onChange={onAXChange} step={0.1}/>
+                <NumericInput value={axisAngle.axis[1].toPrecision(3)} onChange={onAYChange} step={0.1}/>
+                <NumericInput value={axisAngle.axis[2].toPrecision(3)} onChange={onAZChange} step={0.1}/>
                 <div>Angle: 
-                    <NumericInput value={axisAngle.angle+""} onChange={onAngleChange} step={1}/>
+                    <NumericInput value={axisAngle.angle.toPrecision(3)} onChange={onAngleChange} step={1}/>
                 </div>
 
             </div>
             
             <div><span>Scale</span></div>
             <div>
-                <NumericInput value={scale[0]+""} onChange={onSXChange} step={0.25}/>
-                <NumericInput value={scale[1]+""} onChange={onSYChange} step={0.25}/>
-                <NumericInput value={scale[2]+""} onChange={onSZChange} step={0.25}/>
+                <NumericInput value={scale[0].toPrecision(3)} onChange={onSXChange} step={0.25}/>
+                <NumericInput value={scale[1].toPrecision(3)} onChange={onSYChange} step={0.25}/>
+                <NumericInput value={scale[2].toPrecision(3)} onChange={onSZChange} step={0.25}/>
             </div>
         </div>
     )
